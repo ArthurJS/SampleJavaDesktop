@@ -1,0 +1,13 @@
+/*
+ * Empty Stylesheet file.
+ */
+
+.PokeballToSides:after{
+    -fx-graphic:url('images/Pokeball.PNG');
+}
+
+.lblHover:hover{
+    
+   -fx-text-fill: #3C59A5;
+    
+}
