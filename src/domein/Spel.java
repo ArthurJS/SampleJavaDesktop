@@ -1,419 +1,387 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package domein;
 
-import java.util.*;
-import persistentie.SpelbordMapper;
+import java.io.FileNotFoundException;
+import java.util.List;
+import persistentie.SpelMapper;
+import resources.ResourceHandling;
 
 /**
  *
- * @author Mario
+ * @author donovandesmedt
  */
-public class Spel {
+public class Spel
+{
 
-    private List<Spelbord> lijstSpelborden;
-    private Spelbord spelbordInGebruik;
-    private final SpelbordMapper spelbordMapper;
-    private String spelNaam;
-    private Spelbord nieuwSpelbord;
+    private String naam;
+    private boolean Voltooid;
+    private boolean isEindeSpel;
+
+    private List<Spelbord> spelborden;
+    private Spelbord spelbord;
+    private Spelbord initeelSpelbord;
+    private Spelbord geresetSpelbord;
+    private SpelMapper spelmapper;
 
     /**
-     * Constructor die de spelnaam set in het overeenkomstige klasse attribuut
-     * en een spelbordMapper object aanmaakt
-     * {@link SpelbordMapper#SpelbordMapper()}. Aan de hand van het
-     * spelbordMapper object wordt het klasse attribuut lijstSpelborden opgevult
-     * door de methode {@link SpelbordMapper#geefSpelbord(java.lang.String)} Als
-     * de lijstSpelborden Spelborden bevat worden deze gebruikt om de velden in
-     * de Spelbord klasse op te vullen {@link Spelbord#voegVeldToe(java.util.List)
-     * }
-     * Het eerste spelbord uit deze lijst wordt ook aangewezen aan het klasse
-     * attribuut spelbordInGebruik.
-     *
-     * @param spelNaam
+     * constructor
+     * @param naam
+     * @param spelborden 
      */
-    public Spel(String spelNaam) {
-        setSpelNaam(spelNaam);
-        spelbordMapper = new SpelbordMapper();
-        this.lijstSpelborden = spelbordMapper.geefSpelbord(this.spelNaam);
-        if (!this.lijstSpelborden.isEmpty()) { //Nieuw spel bevat nog geen spelborden
-            for (int i = 0; i < lijstSpelborden.size(); i++) {
-                Spelbord spelbord = lijstSpelborden.get(i);
-                spelbord.voegVeldToe(spelbordMapper.geefVelden(this.spelNaam, spelbord.getSpelbordNr()));
-                //spelbord.voegInitieelSpelbordToeAanStack();
-            }
-            spelbordInGebruik = lijstSpelborden.get(0);
+    public Spel(String naam, List<Spelbord> spelborden)
+    {
+        setNaam(naam);
+        setIsVoltooid(false);
+        setEindeSpel(false);
+        setSpelborden(spelborden);
+    }
+    
+    /**
+     * constructor
+     * @param naam 
+     */
+    public Spel(String naam)
+    {
+        this(naam, null);
+    }
+    
+    /**
+     * naam van het spel opvragen
+     * @return 
+     */
+    public String getNaam()
+    {
+        return naam;
+    }
+
+    /**
+     * setten van naam
+     * @param naam 
+     */
+    public void setNaam(String naam)
+    {
+        if (!naam.isEmpty() && !naam.equals(""))
+        {
+            this.naam = naam;
+        } else
+        {
+            throw new IllegalArgumentException("naam spel is leeg");
         }
     }
 
     /**
-     * Deze methode geeft het klasse attribuut spelNaam terug.
-     *
-     * @return spelNaam
+     * kijken of het spel voltooid is
+     * @return 
      */
-    public String getSpelNaam() {
-        return spelNaam;
+    public boolean isVoltooid()
+    {
+        return Voltooid;
     }
 
     /**
-     * Deze methode stelt het klasse attribuut spelNaam in.
-     *
-     * @param spelNaam
+     * setten of het spel voltooid is
+     * @param Voltooid 
      */
-    public void setSpelNaam(String spelNaam) {
-        this.spelNaam = spelNaam;
+    public void setIsVoltooid(boolean Voltooid)
+    {
+        this.Voltooid = Voltooid;
     }
 
     /**
-     * Deze methode verwijderd eerst en vooral alle doelen (attributen) van het
-     * spelbordInGebruik object {@link Spelbord#getVeldenMetDoel() }, voegt
-     * velden toe aan het spelbordInGebruik object, cleart de undo-Stack {@link Spelbord#clearundoStack()
-     * } en reset het attribuut aantalVerplaatsingen {@link Spelbord#setAantalVerplaatsingen(int)
-     * }
-     *
-     * @return Spelbord in de vorm van char[][] {@link Spel#geefSpelbordInGebruik()
-     * }
+     * lijst met spelborden op vragen
+     * @return 
      */
-    public char[][] geefSpelbordInGebruikInit() {
-        spelbordInGebruik.getVeldenMetDoel().clear();
-        spelbordInGebruik.voegVeldToe(spelbordMapper.geefVelden(this.spelNaam, spelbordInGebruik.getSpelbordNr()));
-        spelbordInGebruik.setAantalVerplaatsingen(0);
-        spelbordInGebruik.clearundoStack();
-        return geefSpelbordInGebruik();
-    }
-
-    /**
-     * Deze methode wordt gebruikt bij het weergeven van een reeds bestaand
-     * spelbord
-     *
-     * @return spelbordInGebruik, deze worden opgevult adhv de relaties door de
-     * methode {@link Veld#toChar()}.
-     */
-    public char[][] geefSpelbordInGebruik() {
-        Veld sb[][] = spelbordInGebruik.getSpelbordMap();
-        char spelbordReturn[][] = new char[10][10];
-        int i = 0;
-        for (Veld[] rijen : sb) {
-            int j = 0;
-            for (Veld kolommen : rijen) {
-                if (kolommen == null) {
-                    spelbordReturn[i][j] = '+';
-                } else {
-                    spelbordReturn[i][j] = kolommen.toChar();
-                }
-                j++;
-            }
-            i++;
-        }
-        return spelbordReturn;
-    }
-
-    /**
-     * Deze methode wordt gebruikt bij het weergeven van een reeds bestaand
-     * spelbord
-     * @param spelbord
-     * @return return char[][] van het mee gegeven spelbord, deze worden
-     * opgevult adhv de relaties door de methode {@link Veld#toChar()}.
-     */
-    public char[][] geefSpelbord(Spelbord spelbord) {
-        Veld sb[][] = spelbord.getSpelbordMap();
-        char spelbordReturn[][] = new char[10][10];
-        int i = 0;
-        for (Veld[] rijen : sb) {
-            int j = 0;
-            for (Veld kolommen : rijen) {
-                if (kolommen == null) {
-                    spelbordReturn[i][j] = '+';
-                } else {
-                    spelbordReturn[i][j] = kolommen.toChar();
-                }
-                j++;
-            }
-            i++;
-        }
-        return spelbordReturn;
-    }
-
-    /**
-     * Deze methode word gebruikt bij het bouwen van een nieuw spelbord
-     *
-     * @return niewSpelbord, deze worden opgevult adhv de relaties door de
-     * methode {@link Veld#toChar()}.
-     */
-    public char[][] geefNieuwSpelbord() {
-        Veld sb[][] = nieuwSpelbord.getSpelbordMap();
-        char spelbordReturn[][] = new char[10][10];
-        int i = 0;
-        for (Veld[] rijen : sb) {
-            int j = 0;
-            for (Veld kolommen : rijen) {
-                if (kolommen == null) {
-                    spelbordReturn[i][j] = '+';
-                } else {
-                    spelbordReturn[i][j] = kolommen.toChar();
-                }
-                j++;
-            }
-            i++;
-        }
-        return spelbordReturn;
-    }
-
-    /**
-     * Geeft het aantal voltooide spelborden terug adhv {@link Spelbord#checkIsVoltooid()
-     * }
-     *
-     * @return aantalVoltooid
-     */
-    public int geefAantalVoltooideSpelborden() {
-        int aantalVoltooid = 0;
-        for (Spelbord sb : this.lijstSpelborden) {
-            if (sb.checkIsVoltooid()) {
-                aantalVoltooid += 1;
-            }
-        }
-        return aantalVoltooid;
-    }
-
-    /**
-     * Geeft het totaal aantal spelborden terug
-     *
-     * @return aantal spelborden (int) van {@link Spel#lijstSpelborden}
-     */
-    public int geefTotaalAantalSpelborden() {
-        return this.lijstSpelborden.size();
-    }
-
-    /**
-     * Geeft het aantal verplaatsingen terug adhv
-     * {@link Spelbord#geefAantalVerplaatsingen())}
-     *
-     * @return aantal verplaatsingen van {@link Spel#spelbordInGebruik}
-     */
-    public int geefAantalVerplaatsingen() {
-        return spelbordInGebruik.geefAantalVerplaatsingen();
-    }
-
-    /**
-     * Verplaatst het mannetje adhv {@link Spelbord#verplaatsMannetje(java.lang.String)
-     * }
-     *
-     * @param beweging de door de gebruiker ingevoerde beweging
-     */
-    public void verplaatsMannetje(String beweging) {
-        spelbordInGebruik.verplaatsMannetje(beweging);
-    }
-
-    /**
-     * Controlleert of de undo-Stack leeg is adhv
-     * {@link Spelbord#IsStackEmpty() ()}
-     *
-     * @return true/false of deze leeg is.
-     */
-    public boolean IsStackEmpty() {
-        return this.spelbordInGebruik.IsStackEmpty();
-    }
-
-    /**
-     * Kijkt of het spelbord in gebruik voltooid is
-     * {@link Spelbord#checkIsVoltooid()} en veranderd het huidig spel als het
-     * voltooid is (behalve het laatste spel, anders Error)
-     *
-     * @return true/false of deze voltooid is
-     */
-    public boolean checkSpelbordInGebruikIsVoltooid() {
-        boolean isVoltooid = spelbordInGebruik.checkIsVoltooid();
-        if (isVoltooid == true) {
-            int indexHuidigSpel = this.lijstSpelborden.indexOf(spelbordInGebruik);
-            if (!(indexHuidigSpel == lijstSpelborden.size() - 1)) {
-                this.spelbordInGebruik = this.lijstSpelborden.get(indexHuidigSpel + 1);
-            }
-        }
-        return isVoltooid;
-    }
-
-    /**
-     * Checkt of het {@link Spel#spelbordInGebruik} het laatste spelbord van de
-     * {@link Spel#lijstSpelborden} is.
-     *
-     * @return true/false of deze het laatste spelbord is van een spel
-     */
-    public boolean isLaatsteSpelbordVanHuidigSpel() {
-        return this.lijstSpelborden.indexOf(spelbordInGebruik) == lijstSpelborden.size() - 1;
-    }
-
-    /**
-     * Construeert een nieuw Spelbord adhv een spelbord nummer, dit spelbord
-     * wordt toegevoegd aan het klasse attribuut lijstSpelborden en stelt het
-     * klaase attribuut nieuwSpelbord in
-     *
-     * @param spelbordNr
-     */
-    public void maakSpelbord(int spelbordNr) {
-        Spelbord nieuwSpelbordLocal = new Spelbord(spelbordNr);
-        this.lijstSpelborden.add(nieuwSpelbordLocal);
-        this.nieuwSpelbord = nieuwSpelbordLocal;
-    }
-
-    /**
-     * plaatst een item adhv {@link Spelbord#plaatsItem(char, int, int) op een nieuw spelbord
-     * }
-     *
-     * @param item symbool voor het gewenste item
-     * @param XCOORD de X-coord, 0-based
-     * @param YCOORD de Y-coord, 0-based
-     */
-    public void plaatsItem(char item, int XCOORD, int YCOORD) {
-        this.nieuwSpelbord.plaatsItem(item, XCOORD, YCOORD);
-    }
-
-    /**
-     * plaatst een item adhv {@link Spelbord#plaatsItem(char, int, int)} op een
-     * reeds bestaand spelbord
-     *
-     * @param item symbool voor het gewenste item
-     * @param XCOORD de X-coord, 0-based
-     * @param YCOORD de Y-coord, 0-based
-     */
-    public void plaatsItemWijziging(char item, int XCOORD, int YCOORD) {
-        this.spelbordInGebruik.plaatsItem(item, XCOORD, YCOORD);
-    }
-
-    /**
-     * Controleeert of het nieuw aangemaakte spelbord voldoet aan de voorwaarden{@link Spelbord#IsCorrectControleSpelbord()
-     * }
-     *
-     * @return true/false of het voldoet aan de voorwaarden
-     */
-    public boolean IsCorrectControleNieuwSpelbord() {
-        return this.nieuwSpelbord.IsCorrectControleSpelbord();
-    }
-
-    /**
-     * Stelt alle spelborden, in de lijstSpelborden, in adhv het spelbordMapper
-     * object {@link SpelbordMapper#registreerNieuwSpelbord(java.lang.String, domein.Spelbord)
-     * }
-     */
-    public void registreerNieuwSpelbord() {
-        for (int aantalspelborden = 0; aantalspelborden < this.lijstSpelborden.size(); aantalspelborden++) {
-            this.spelbordMapper.registreerNieuwSpelbord(this.spelNaam, this.lijstSpelborden.get(aantalspelborden));
-        }
-    }
-
-    /**
-     * Verwijderd het aangemaakte spelbord, en maakt een nieuw Spelbord aan. {@link Spel#maakSpelbord(int)
-     * }
-     *
-     * @param spelbordNr het te verwijderen spelbord, voorgesteld door zijn
-     * nummer
-     */
-    public void resetBord(int spelbordNr) {
-        this.lijstSpelborden.remove(lijstSpelborden.size() - 1);
-        maakSpelbord(spelbordNr);
-    }
-
-    /**
-     * Geeft het aantal doelen terug {@link Spelbord#geefAantalDoelen() } van
-     * een nieuw spel
-     *
-     * @return aantal doelen (int)
-     */
-    public int geefAantalDoelen() {
-        return this.nieuwSpelbord.geefAantalDoelen();
-    }
-
-    /**
-     * Geeft het aantal doelen terug {@link Spelbord#geefAantalDoelen() } van
-     * een reeds bestaand spel
-     *
-     * @return aantal doelen (int)
-     */
-    public int geefAantalDoelenConfig() {
-        return this.spelbordInGebruik.geefAantalDoelen();
-    }
-
-    /**
-     * Geeft het aantal kisten terug {@link Spelbord#geefAantalKisten() } van
-     * een nieuw spel
-     *
-     * @return aantal kisten (int)
-     */
-    public int geefAantalKisten() {
-        return this.nieuwSpelbord.geefAantalKisten();
-    }
-
-    /**
-     * Geeft het aantal kisten terug {@link Spelbord#geefAantalKisten() } van
-     * een reeds bestaand spel
-     *
-     * @return aantal kisten (int)
-     */
-    public int geefAantalKistenConfig() {
-        return this.spelbordInGebruik.geefAantalKisten();
-    }
-
-    /**
-     * Geeft een lijst terug van char[][] (alle spelborden) van een Spel. Deze
-     * lijst wordt gevult door {@link Spel#geefSpelbord(domein.Spelbord) }
-     *
-     * @return lijst met spelborden van char[][]
-     */
-    public ArrayList<char[][]> geefLijstSpelbordenGeselecteerdSpel() {
-        ArrayList<char[][]> spelborden = new ArrayList<>();
-        for (Spelbord sb : this.lijstSpelborden) {
-            spelborden.add(geefSpelbord(sb));
-        }
-
+    public List<Spelbord> getSpelborden()
+    {
         return spelborden;
     }
 
     /**
-     * Geeft het huidig spelbord in gebruik terug in char[][]
+     * setten van spelborden van het spel
+     * @param spelborden 
+     */
+    public void setSpelborden(List<Spelbord> spelborden)
+    {
+        this.spelborden = spelborden;
+    }
+
+    /**
+     * lijst van spelborden tonen
+     * @param gekozenspel
+     * @return 
+     */
+    public String[] geefLijstSpelborden(String gekozenspel)
+    {
+        /**
+         * Array maken van de gekozen spelbord namen
+         */
+        String[] spelbordenArray = new String[spelborden.size()];
+
+        for (int index = 0; index < spelbordenArray.length; index++)
+        {
+            spelbordenArray[index] = spelborden.get(index).getNaam();
+        }
+
+        return spelbordenArray;
+    }
+
+    /**
+     * spelbord geven
+     * @return 
+     */
+    public Spelbord getSpelbord()
+    {
+        return spelbord;
+    }
+    
+    /**
+     * geven van het spelbord
+     * @param naam
+     * @return 
+     */
+    public Spelbord geefSpelbord(String naam)
+    {
+        List<Spelbord> spelborden = getSpelborden();
+        for(Spelbord s: spelborden)
+        {
+            if(s.getNaam().equals(naam))
+                return s;
+        }
+        return null;
+    }
+    
+    /**
+     * extra methode die de naam van het eerste spelbord teruggeeft dat nog niet
+     * voltooid is
      *
-     * @param nr nummer van het spelbord
-     * @return spelbordInGebruik in char[][[] adhv {@link Spel#geefSpelbordInGebruik()
-     * }
+     * @param spelbord
      */
-    public char[][] geefGekozenSpelbord(int nr) {
-
-        Spelbord spelbord = this.lijstSpelborden.get(nr - 1);
-        this.spelbordInGebruik = spelbord;
-
-        return geefSpelbordInGebruik();
+    public void zoekNietVoltooidSpelbord()
+    {
+        for (Spelbord s : spelborden)
+        {
+            if (!s.isVoltooid())
+            {
+                /**
+                 * Het gevonden spelbord wordt geset
+                 */
+                setSpelbord(s);
+                geresetSpelbord = s;
+                //initeelSpelbord = new Spelbord(s);
+                return;
+            }
+        }
+        
+        setEindeSpel(true);
+    }
+    
+    /**
+     * setten van het spelbord
+     * @param spelbord 
+     */
+    public void setSpelbord(Spelbord spelbord)
+    {
+        if (spelbord != null)
+        {
+            this.spelbord = spelbord;
+        } else
+        {
+            throw new IllegalArgumentException("Spelbord object is niet geinitialiseerd");
+        }
     }
 
     /**
-     * verwijderd een spelbord adhv het spelbordMapper object {@link SpelbordMapper#verwijderSpelbord(domein.Spel, domein.Spelbord)
-     * }
+     * aantal voltooide spellen tonen
+     * @return 
      */
-    public void verwijderSpelbord() {
-        this.spelbordMapper.verwijderSpelbord(this, this.spelbordInGebruik);
+    public String toonAantal()
+    {
+        /**
+         * Enkele variabelen aanmaken voor het opslaan van data
+         */
+        int teller = 0;
+        String uitvoer = "";
+
+        for (Spelbord spelbord : spelborden)
+        {
+            if (spelbord.isVoltooid())
+            {
+                /**
+                 * Op zoek naar voltooide spelborden
+                 */
+                uitvoer += String.format("Spelbord %s is voltooid%n", spelbord.getNaam());
+                teller++;
+            }
+        }
+        uitvoer += String.format("Er zijn in totaal %d spelborden voltooid%n", teller);
+        return uitvoer;
     }
 
     /**
-     * Schrijft de spelnaam en spelbordInGebruik weg naar de databank adhv
-     * spelbordMapper {@link SpelbordMapper#bevestigWijzigingenWegschrijven(java.lang.String, domein.Spelbord)
-     * }
+     * verder spelen
+     * @param keuze
+     * @return 
      */
-    public void bevestigWijzigingenWegschrijven() {
-        this.spelbordMapper.bevestigWijzigingenWegschrijven(this.spelNaam, this.spelbordInGebruik);;
+    public boolean speelVerder(String keuze)
+    {
+        return  ResourceHandling.getInstance().getString("Speelverder.keuze").contains(keuze);
     }
 
     /**
-     * Stelt het spelbordInGebruikIn adhv het spelbord nr, deze is 1 groter dan
-     * de positie de positie binnen de lijstSpelborden {@link SpelbordMapper#bevestigWijzigingenWegschrijven(java.lang.String, domein.Spelbord)
-     * }
-     *
-     * @param nr nummer van het spelbord
+     * als het einde is behaald
+     * @param isEindeSpel 
      */
-    public void setSpelbordInGebruik(int nr) {
-        this.spelbordInGebruik = this.lijstSpelborden.get(nr - 1);
+    public void setEindeSpel(boolean isEindeSpel)
+    {
+        this.isEindeSpel = isEindeSpel;
     }
 
     /**
-     * Kijkt of de veranderingen van het reeds bestaande spelbord voldoen aan de
-     * voorwaarden
-     *
-     * @return true/false of spelbord voldoet aan de voorwaarden
+     * einde van het spel
+     * @return 
      */
-    public boolean IsCorrectControleGewijzigdSpelbord() {
-        return this.spelbordInGebruik.IsCorrectControleSpelbord();
+    public boolean isEindeSpel()
+    {
+        return isEindeSpel;
     }
+
+    /**
+     * hero verplaatsen
+     * @param richting 
+     */
+    public void verplaatsHero(char richting)
+    {
+        spelbord.verplaatsHero(richting);
+    }
+
+    /**
+     * kijken of het spelbord is voltooid
+     * @return 
+     */
+    public boolean isSpelbordVoltooid()
+    {
+        return spelbord.isSpelbordVoltooid();
+    }
+
+    /**
+     * resetten van een spelbord
+     */
+    public void Reset()
+    {
+        List<Spelbord> spelborden = spelbord.geefOrigineleSpelborden(getNaam());
+        for (Spelbord e : spelborden)
+        {
+            if(e.getNaam().equals(geresetSpelbord.getNaam()))
+            {
+                initeelSpelbord = e;
+                break;
+            }
+        }
+        spelbord.setAantalVerplaatsingen(0);
+        geresetSpelbord.setVoltooid(true);
+        spelbord = null;
+        spelbord = new Spelbord(initeelSpelbord);
+    }
+    
+    /**
+     * vak geven op een bepaalde positie
+     * @param col
+     * @param row
+     * @return 
+     */
+    public Vak geefVakOpPositie(int col, int row)
+    {
+        return spelbord.geefVakOpPositie(col, row);
+    }
+    
+    /**
+     * Spelbord maken van een textfile
+     */
+    public void maakSpelbord(String keuzeSpel) throws FileNotFoundException
+    {
+        spelbord.maakBord(keuzeSpel);
+    }
+    
+    /**
+     * aantal verplaatsingen
+     * @return 
+     */
+    public int geefAantalVerplaatsingen()
+    {
+        return spelbord.getAantalVerplaatsingen();
+    }
+    
+    /**
+     * spel in database plaatsen
+     * @param naam 
+     */
+    public void zetSpelInDataBase(String naam)
+    {
+        /**
+         * Spel in de database zetten.
+         */
+        spelmapper = new SpelMapper();
+        spelmapper.voegSpelToe(naam);
+        
+    }
+    
+    /**
+     * gewijzig spelbord plaatsen in het spelbord
+     * @param spelnaam
+     * @param spelbordnaam 
+     */
+    public void zetGewijzigdSpelbordInDatabase(String spelnaam, String spelbordnaam)
+    {
+        getSpelbord().zetGewijzigdSpelbordInDatabase(spelnaam, spelbordnaam);
+    }
+    
+    /**
+     * deleten van een spelbord
+     * @param spelbordNaam 
+     */
+    public void deleteSpelbord(String spelbordNaam)
+    {
+        for(Spelbord spelbord: spelborden)
+        {
+            if(spelbord.getNaam().equals(spelbordNaam))
+                spelbord.deleteSpelbord(getNaam());
+        }
+    }
+    
+    /**
+     * wijzigen van de spelnaam
+     * @param spelNaam 
+     */
+    public void wijzigSpelNaam(String spelNaam)
+    {
+        getSpelbord().wijzigSpelNaam(getNaam(), spelNaam);
+        spelmapper = new SpelMapper();
+        spelmapper.wijzigNaam(getNaam(), spelNaam);
+    }
+    
+    /**
+     * wijzig van de spelbord naam
+     * @param spelbordNaam 
+     */
+    public void wijzigSpelbordNaam(String spelbordNaam)
+    {
+        getSpelbord().wijzigSpelbordNaam(spelbordNaam);
+    }
+    
+    /**
+     * spelbord in database plaatsen
+     * @param Spelnaam 
+     */
+    public void zetSpelbordInDatabase(String Spelnaam)
+    {
+        /**
+         * Spelborden in de database zetten.
+         */
+        getSpelbord().zetSpelbordInDatabase(Spelnaam, getSpelbord().getNaam());
+    }
+
 }

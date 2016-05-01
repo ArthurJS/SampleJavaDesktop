@@ -1,38 +1,79 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package domein;
 
 /**
  *
- * @author Mario
+ * @author Toon
  */
-public class Kist {
-    private Veld veld;
+public class Kist
+{
+
+    
+    private boolean opDoel;
+    private Vak vak;
+
+    /**
+     * constructor
+     * @param opDoel 
+     */
+    public Kist(boolean opDoel)
+    {
+        setOpDoel(opDoel);
+    }
     
     /**
-     * Constructor van kist die het klasse attribuut veld instelt met het meegegeven veld
-     * @param veld waar de kist opstaat
+     * constructor
      */
-    public Kist(Veld veld){
-        this.veld=veld;
+    public Kist()
+    {
+        
+    }
+    
+    /**
+     * kijken of de kist staat op het doel staat
+     * @return 
+     */
+    public boolean isOpDoel()
+    {
+        return opDoel;
     }
 
     /**
-     *Retourneert een veld Object waar de kist opstaat
-     * @return
-     * veld (Veld)
+     * kist staat op het doel
+     * @param opDoel 
      */
-    public Veld getVeld() {
-        return veld;
+    public void setOpDoel(boolean opDoel)
+    {
+        this.opDoel = opDoel;
     }
 
     /**
-     * Stelt een Veld object in waar de kist opstaat
-     * @param veld
+     * vak op vragen waar de kist op staat
+     * @return 
      */
-    public void setVeld(Veld veld) {
-        this.veld = veld;
+    public Vak getVak()
+    {
+        return vak;
     }
-    
-    
+
+    /**
+     * setten van het vak
+     * @param vak 
+     */
+    public void setVak(Vak vak)
+    {
+        if (vak != null)
+        {
+            this.vak = vak;
+        } else
+
+        {
+            throw new IllegalArgumentException("Vak van kist krijgt een null object!");
+        }
+    }
+
 }
-
-    

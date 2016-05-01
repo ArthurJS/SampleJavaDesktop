@@ -1,596 +1,864 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package domein;
 
-import static LanguageResources.Resource.labels;
-import exceptions.NieuwSpelbordException;
-import java.util.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import persistentie.KistMapper;
+import persistentie.MannetjeMapper;
+import persistentie.SpelbordMapper;
+import persistentie.VakMapper;
+import resources.ResourceHandling;
 
 /**
  *
- * @author Thibault Fouquaert
+ * @author donovandesmedt
  */
-public class Spelbord {
+public class Spelbord
+{
 
-    //private Collection<Veld> velden;
-    private ArrayList<Veld> VeldenMetDoel;
-    private Mannetje mannetje;//eigenlijk final. gaat niet in code.
+    private String naam;
+    private boolean Voltooid;
+    //private int positieMan;
+
+    private VakMapper vakMapper;
+    private List<Vak> vakkenSpelbord;
+    private List<Kist> kisten;
+    private Mannetje man;
     private int aantalVerplaatsingen;
-    private Veld[][] spelbordMap;
-    private int spelbordNr;
-    private Stack<Veld[][]> undoStack;
-
-    // # = muur
-    // o = doel (kleine o)
-    // K = Kist
-    // . = leeg
-    // @ = Speler
-    // + = achtergrond
+    private SpelbordMapper spelbordmapper;
+    private final int MAX_VAKKEN = 100;
+    private boolean bevatMan;
+    private boolean alleOnderdelen;
+    
     /**
-     * Constructor van het spelbord waarbij het aantal verplaatsingen
-     * automatisch op 0 wordt gezet.
-     *
-     * @param spelbordnr nr van het spelbord in de databse, 1-based.
+     * constructor
+     * @param naam
+     * @param Voltooid
+     * @param vakkenSpelbord
+     * @param kisten
+     * @param man 
      */
-    public Spelbord(int spelbordnr) {
-        this(spelbordnr, 0);
+    public Spelbord(String naam, boolean Voltooid, List<Vak> vakkenSpelbord, List<Kist> kisten, Mannetje man)
+    {
+        setNaam(naam);
+        setVoltooid(Voltooid);
+        setVakkenSpelbord(vakkenSpelbord);
+        setKisten(kisten);
+        setMan(man);
+        bevatMan = false;
+        alleOnderdelen = false;
+        if (vakkenSpelbord != null)
+        {
+            if (!vakkenSpelbord.isEmpty())
+            {
+                vulVakkenIn();
+                setAantalVerplaatsingen(0);
+            }
+        }
     }
 
     /**
-     * Constructor van spelbord, maakt de spelbordmap, lijst van velden met doel
-     * en undostack aan.
-     *
-     * @param spelbordnr nr van het spelbord in de database, 1 based.
-     * @param aantalVerplaatsingen aantal verplaatsingen. standaard 0.
+     * constructor
+     * @param naam 
      */
-    public Spelbord(int spelbordnr, int aantalVerplaatsingen) {
-        setSpelbordNr(spelbordnr);
-        setAantalVerplaatsingen(aantalVerplaatsingen);
-        this.spelbordMap = new Veld[10][10];
-        this.VeldenMetDoel = new ArrayList<>();
-        this.undoStack = new Stack<>();
+    public Spelbord(String naam)
+    {
+        /**
+         * Deze constructor maakt aan de hand van een naam een default map aan
+         */
+        this(naam, false, null, null, null);
+        vulDefaultVakkenI();
+        kisten = new ArrayList<>();
     }
 
     /**
-     *
-     * @return {@link Spelbord#spelbordMap}
+     * constructor
+     * @param spelbord 
      */
-    public Veld[][] getSpelbordMap() {
-        return spelbordMap;
+    public Spelbord(Spelbord spelbord)
+    {
+        this(spelbord.getNaam(), spelbord.isVoltooid(), spelbord.geefVakken(), spelbord.getKisten(), spelbord.getMan());
     }
 
     /**
-     *
-     * @return {@link Spelbord#aantalVerplaatsingen}
+     * vul een default spelbord in
      */
-    public int geefAantalVerplaatsingen() {
-        return this.aantalVerplaatsingen;
+    private void vulDefaultVakkenI()
+    {
+        vakkenSpelbord = new ArrayList<>();
+        int j = 0;
+        for (int i = 0; i < MAX_VAKKEN; i++)
+        {      
+            if(i%10==0 && i!=0)
+            {
+                j++;
+            }       
+            vulVakMuurIn(i%10, j);       
+        }
+    }
+    
+    /**
+     * plaatsen van item in het spelbord
+     * @param col
+     * @param rij
+     * @param ID 
+     */
+    public void plaatsVakInLijst(int col, int rij , int ID)
+    {
+        int positie = (rij*10) + col;
+        switch(ID)
+        {
+            case 0:
+                /**Mannetje plaatsen*/
+                if(!bevatMan && !isRand(positie))
+                {
+                VakWandel vak = plaatsVakWandel(col, rij,false);         
+                man = new Mannetje();
+                vak.setHero(man);
+                man.setVak(vak);
+                bevatMan = true;
+                bevatKist(positie);
+                vakkenSpelbord.set(positie, vak);
+                break;
+                }
+            case 1: 
+                /**wandelbaarPad maken*/
+                if(!isRand(positie))
+                {
+                bevatKist(positie);
+                bevatMannetje(positie);
+                vakkenSpelbord.set(positie, plaatsVakWandel(col, rij,false));
+                break;
+                }
+            case 2:
+                /**Doel maken*/
+                if(!isRand(positie))
+                {
+                bevatKist(positie);
+                bevatMannetje(positie);
+                vakkenSpelbord.set(positie,plaatsVakWandel(col, rij,true));
+                break;
+                }
+            case 3:
+                /**Kist*/
+                bevatKist(positie);
+                bevatMannetje(positie);
+                vakkenSpelbord.set(positie, plaatsVakMuur(col, rij));
+                break;
+            case 4:
+                /**Kist*/
+                if(!isRand(positie))
+                {
+                bevatKist(positie);
+                bevatMannetje(positie);
+                VakWandel vakje = plaatsVakWandel(col, rij, false);
+                Kist kist = plaatsKist();
+                vakje.setKist(kist);
+                vakkenSpelbord.set(positie, vakje);
+                kisten.add(kist);
+                break;
+                }
+        }
+    }
+    
+    /**
+     * kijken of het vak een kist heeft
+     * @param positie 
+     */
+    private void bevatKist(int positie)
+    {
+        if(vakkenSpelbord.get(positie).getKist() != null)
+        {
+            int index = kisten.indexOf(vakkenSpelbord.get(positie).getKist());
+            kisten.remove(index);
+        }
+    }
+    
+    /**
+     * kijken of het vak een mannetje heeft
+     * @param positie 
+     */
+    private void bevatMannetje(int positie)
+    {
+        if(vakkenSpelbord.get(positie).getHero() != null)
+            bevatMan = false;        
+    }
+    
+    /**
+     * kijken of alles in het spelbpord zit dat er in moet zitten
+     * @return 
+     */
+    public boolean bevatAlleOnderdelen()
+    {
+        return alleOnderdelen;
+    }
+    
+    /**
+     * gaat kijken dat het spelbord goed aangemaakt is en dat er niks vergeten is
+     * @return 
+     */
+    public String gebreken()
+    {
+        boolean bevatMan = false, bevatKist = false, correctAantalKisten = true;
+        int aantalKisten=0, aantalDoelen=0;
+        
+        for(Vak vak: vakkenSpelbord)
+        {
+            if(vak.isBewandelbaar())
+            {
+                VakWandel wandelvak = (VakWandel)vak;
+                if(wandelvak.isIsDoel())
+                    aantalDoelen++;
+                if(vak.bevatMannetje())
+                    bevatMan = true;
+                if(vak.bevatKist())
+                {
+                    bevatKist = true;
+                    aantalKisten++;
+                }       
+            }        
+        }
+        if(aantalKisten !=0 && aantalDoelen != 0 && aantalKisten != aantalDoelen )
+            correctAantalKisten = false;
+        
+        if(bevatMan && bevatKist && correctAantalKisten)
+        {
+            alleOnderdelen = true;
+            return ResourceHandling.getInstance().getString("Custommap.goed");
+        }
+        else if(bevatMan && bevatKist)
+                return ResourceHandling.getInstance().getString("Custommap.kisten");
+        else if(bevatMan)
+                return ResourceHandling.getInstance().getString("Custommap.man");
+        else if(bevatKist)
+                return ResourceHandling.getInstance().getString("Custommap.kist");
+        else if(aantalDoelen>0)
+                return ResourceHandling.getInstance().getString("Custommap.niks");
+        else
+           return ResourceHandling.getInstance().getString("Custommap.niks");
+        
+    }
+    
+    /**
+     * bevind je je op de rand
+     * @param pos
+     * @return 
+     */
+    private boolean isRand(int pos)
+    {
+        return(pos < 10 || pos%10 == 0 || pos%10 == 9 || pos > 89);
     }
 
     /**
-     *
-     * @return {@link Spelbord#spelbordNr}
+     * muur in lijst steken
+     * @param positieX
+     * @param positieY 
      */
-    public int getSpelbordNr() {
-        return spelbordNr;
+    private void vulVakMuurIn(int positieX, int positieY)
+    {
+        vakkenSpelbord.add(new VakMuur(2, positieX, positieY));
+    }
+    
+    /**
+     * plaatsen van vakwandel
+     * @param positieX
+     * @param positieY
+     * @param isDoel
+     * @return 
+     */
+    private VakWandel plaatsVakWandel(int positieX, int positieY , boolean isDoel)
+    {
+        return new VakWandel(1, positieX,positieY,isDoel);
+    }
+    
+    /**
+     * plaatsen van een vakmuur
+     * @param positieX
+     * @param positieY
+     * @return 
+     */
+    private VakMuur plaatsVakMuur(int positieX, int positieY)
+    {
+        return new VakMuur(2, positieX, positieY);
+    }
+    
+    /**
+     * plaatsen van de kist
+     * @return 
+     */
+    private Kist plaatsKist()
+    {
+        return new Kist(false);
+    }
+    
+    /**
+     * in vullen van het spelbord met het mannetje en de kisten
+     */
+    private void vulVakkenIn()
+    {     
+        /**Zorgen dat de juiste vakken met de juiste objecten worden ingevuld*/
+        int kistIndex = 0;
+        
+        for(int i = 0; i < vakkenSpelbord.size(); i++)
+        {
+            if(vakkenSpelbord.get(i).getiD() == 6)
+            {
+                vakkenSpelbord.get(i).setHero(man);
+                man.setVak(vakkenSpelbord.get(i));
+            }else if(vakkenSpelbord.get(i).getiD() == 3)
+            {
+                vakkenSpelbord.get(i).setKist(kisten.get(kistIndex));
+                kisten.get(kistIndex).setVak(vakkenSpelbord.get(i));
+            }
+        }
     }
 
     /**
-     * set het spelbordnr, 1-based.
-     *
-     * @param spelbordNr
+     * opvragen van de naam
+     * @return 
      */
-    public void setSpelbordNr(int spelbordNr) {
-        this.spelbordNr = spelbordNr;
+    public String getNaam()
+    {
+        return naam;
     }
 
     /**
-     * set het aantal verplaatsingen.
-     *
-     * @param aantalVerplaatsingen
+     * setten van het spelbord naam
+     * @param naam 
      */
-    public void setAantalVerplaatsingen(int aantalVerplaatsingen) {
+    public void setNaam(String naam)
+    {
+        this.naam = naam;
+    }
+
+    /**
+     * is het spelbord voltooid?
+     * @return 
+     */
+    public boolean isVoltooid()
+    {
+        return Voltooid;
+    }
+
+    /**
+     * setten als het spelbord voltooid is
+     * @param Voltooid 
+     */
+    public void setVoltooid(boolean Voltooid)
+    {
+        this.Voltooid = Voltooid;
+    }
+
+    /**
+     * geven van vakken
+     * @return 
+     */
+    public List<Vak> geefVakken()
+    {
+        return vakkenSpelbord;
+    }
+
+    /**
+     * setten van het vakken van het spelbord
+     * @param vakkenSpelbord 
+     */
+    public void setVakkenSpelbord(List<Vak> vakkenSpelbord)
+    {
+        this.vakkenSpelbord = vakkenSpelbord;
+    }
+
+    /**
+     * opvragen van de lijst met kisten
+     * @return 
+     */
+    public List<Kist> getKisten()
+    {
+        return kisten;
+    }
+
+    /**
+     * setten van het kisten
+     * @param kisten 
+     */
+    public void setKisten(List<Kist> kisten)
+    {
+        this.kisten = kisten;
+    }
+
+    /**
+     * opvragen van het mannetje
+     * @return 
+     */
+    public Mannetje getMan()
+    {
+        return man;
+    }
+
+    /**
+     * set van het manntje
+     * @param man 
+     */
+    public void setMan(Mannetje man)
+    {
+        this.man = man;
+    }
+
+    /**
+     * geven van verplaatsingen
+     * @return 
+     */
+    public int getAantalVerplaatsingen()
+    {
+        return aantalVerplaatsingen;
+    }
+
+    /**
+     * setten van verplaatsingen
+     * @param aantalVerplaatsingen 
+     */
+    public void setAantalVerplaatsingen(int aantalVerplaatsingen)
+    {
         this.aantalVerplaatsingen = aantalVerplaatsingen;
     }
 
     /**
-     *
-     * @return {@link Spelbord#mannetje}, mag normaal gezien niet null zijn.
+     * commando wordt ingegeven en zegt hoe en waar het mannetje moet naar verplaatsen
+     * @param richting 
      */
-    public Mannetje getMannetje() {
-        return mannetje;
-    }
+    public void verplaatsHero(char richting)
+    {
+        /**
+         * Kijken welk command we binnen gekregen hebben om ons mannetje te laten bewegen
+         */
 
-    /**
-     * Leegt de stack waarop de undo's staan.
-     */
-    public void clearundoStack() {
-        this.undoStack.clear();
-    }
-
-    /**
-     * Checkt of de {@link Spelbord#undoStack} leeg is of niet.
-     *
-     * @return true als de stack leeg is.
-     */
-    public boolean IsStackEmpty() {
-        return this.undoStack.isEmpty();
-    }
-
-    /**
-     *
-     * @return een lijst met velden waarbij het attr. {@link Veld#heeftDoel}
-     * true is.
-     */
-    public ArrayList<Veld> getVeldenMetDoel() {
-        return VeldenMetDoel;
-    }
-
-    /**
-     * set de lijst van velden met een doel.
-     *
-     * @param VeldenMetDoel lijst van velden waarbij het attr.
-     * {@link Veld#heeftDoel} true is.
-     */
-    public void setVeldenMetDoel(ArrayList<Veld> VeldenMetDoel) {
-        this.VeldenMetDoel = VeldenMetDoel;
-    }
-
-    /**
-     * Voegt alle velden toe van de meegegeven list, aan de
-     * {@link Spelbord#spelbordMap} op basis van de X/Y coordinaten van het veld
-     * object. Als het veld een {@link Mannetje} bevat in
-     * {@link Veld#hetMannetje}, wordt dit object geset in
-     * {@link Spelbord#mannetje}. Als het {@link Veld#heeftDoel} true is, wordt
-     * het veld toegevoegd aan de {@link Spelbord#VeldenMetDoel}
-     *
-     * @param velden een List van {@link Veld} objecten.
-     */
-    public void voegVeldToe(List<Veld> velden) {
-        for (Veld veld : velden) {
-            int x = veld.getX();
-            int y = veld.getY();
-            this.spelbordMap[y][x] = veld;
-            if (veld.getHetMannetje() != null) {
-                this.mannetje = veld.getHetMannetje();
-            }
-            if (veld.getHeeftDoel()) {
-                this.VeldenMetDoel.add(veld);
-            }
+        switch (richting)
+        {
+            case 'l':
+                verplaatsing(-1, -2);
+                break;
+            case 'r':
+                verplaatsing(1, 2);
+                break;
+            case 'b':
+                verplaatsing(-10, -20);
+                break;
+            case 'o':
+                verplaatsing(10, 20);
+                break;
         }
     }
 
     /**
-     * Verplaats het mannetje en (eventueel) een kist als een geldige zet gedaan
-     * word. geldige zet = Als er in de richting dat je het mannetje wilt
-     * verplaatsen(boven, onder, links, rechts) geen muur staat, of geen 2
-     * kisten achter elkaar in de richting van je verplaatsing. Als een kist
-     * verplaatst wordt, zal het {@link Veld#kist} van het originele veld
-     * toegekend worden aan het {@link Veld#kist} van het veld in de richting
-     * waarin je je verplaatst. Als er een geldige zet word gezet zal het
-     * {@link Veld#hetMannetje} worden toegekend aan het nieuwe
-     * {@link Veld#hetMannetje} van de richting waarin je je verplaats. Ook het
-     * {@link Spelbord#mannetje} verwijst dan nog steeds naar het mannetje op
-     * het ander veld. Bij een geldige zet word er ook een copy (gebruikts {@link Spelbord#deepCopyVeld(domein.Veld[][])
-     * }) van het spelbordmap op de stack geplaatst. Als de beweging u is, word
-     * de {@link Spelbord#spelbordMap} ingesteld naar de copy van de
-     * {@link Spelbord#spelbordMap} bij de vorige verplaatsing.
-     *
-     * @param beweging richting waarin je je wilt verplaatsen. Z, s, q , d. u
-     * voor een undo.
+     * verplaatsing doen van de kist
+     * @param offset
+     * @param volgendOffset 
      */
-    public void verplaatsMannetje(String beweging) {
-        Veld plaatsMannetje = mannetje.getVeld();
-        int x = plaatsMannetje.getX();
-        int y = plaatsMannetje.getY();
-        boolean succesMovement = false;
+    private void verplaatsing(int offset, int volgendOffset)
+    {
+        /**
+         * Zien of we kunnen verplaatsen
+         */
 
-        if (!beweging.equalsIgnoreCase("u")) {
-            this.undoStack.push(deepCopyVeld(spelbordMap));
-        }
-        if (beweging.equalsIgnoreCase("q")) {
-            //eerst checken of volgende plaats geen muur is.
-            if (spelbordMap[y][x - 1].getIsMuur() == false) {
-                //dan checken of het een kist is. zonee, enkel mannetje verplaatsen en niets van kisten.
-                if (spelbordMap[y][x - 1].getKist() != null) {
-                    if (spelbordMap[y][x - 2].getIsMuur() == false && spelbordMap[y][x - 2].getKist() == null) {
-                        //hier de kist van 1 vak naast je naar 2 vakken naast je opschuiven
-                        Kist teVerschuivenKist = spelbordMap[y][x - 1].getKist();
-                        spelbordMap[y][x - 1].setKist(null);
-                        spelbordMap[y][x - 2].setKist(teVerschuivenKist);
-                    } else {
-                        this.undoStack.pop();
-                        return;
-                    }
-                }  //het mannetje niet verschuiven als je de kist naast je ook niet kan verschuiven
-                //hier het mannetje verschuiven naar het veld naast je.
-                this.mannetje.setVeld(spelbordMap[y][x - 1]);
-                spelbordMap[y][x].setHetMannetje(null);
-                spelbordMap[y][x - 1].setHetMannetje(mannetje);
-                aantalVerplaatsingen++;
-                succesMovement = true;
-            }
-            if (succesMovement == false) {
-                this.undoStack.pop();
-            }
-            return; //als je een if van een beweging binnen 'kan', mag je na die code direct stoppen want de andere ifs zijn het dan sowieso niet meer.
-        }
-
-        if (beweging.equalsIgnoreCase("d")) {
-            if (spelbordMap[y][x + 1].getIsMuur() == false) {
-                if (spelbordMap[y][x + 1].getKist() != null) {
-                    if (spelbordMap[y][x + 2].getIsMuur() == false && spelbordMap[y][x + 2].getKist() == null) {
-                        Kist teVerschuivenKist = spelbordMap[y][x + 1].getKist();
-                        spelbordMap[y][x + 1].setKist(null);
-                        spelbordMap[y][x + 2].setKist(teVerschuivenKist);
-                    } else {
-                        this.undoStack.pop();
-                        return;
-                    }
-                }
-                this.mannetje.setVeld(spelbordMap[y][x + 1]);
-                spelbordMap[y][x + 1].setHetMannetje(mannetje);
-                spelbordMap[y][x].setHetMannetje(null);
-                aantalVerplaatsingen++;
-                succesMovement = true;
-            }
-            if (succesMovement == false) {
-                this.undoStack.pop();
-            }
-            return;
-        }
-
-        if (beweging.equalsIgnoreCase("s")) {
-            if (spelbordMap[y + 1][x].getIsMuur() == false) {
-                if (spelbordMap[y + 1][x].getKist() != null) {
-                    if (spelbordMap[y + 2][x].getIsMuur() == false && spelbordMap[y + 2][x].getKist() == null) {
-                        Kist teVerschuivenKist = spelbordMap[y + 1][x].getKist();
-                        spelbordMap[y + 1][x].setKist(null);
-                        spelbordMap[y + 2][x].setKist(teVerschuivenKist);
-                    } else {
-                        this.undoStack.pop();
-                        return;
-                    }
-                }
-                this.mannetje.setVeld(spelbordMap[y + 1][x]);
-                spelbordMap[y + 1][x].setHetMannetje(mannetje);
-                spelbordMap[y][x].setHetMannetje(null);
-                aantalVerplaatsingen++;
-                succesMovement = true;
-            }
-            if (succesMovement == false) {
-                this.undoStack.pop();
-            }
-            return;
-        }
-
-        if (beweging.equalsIgnoreCase("z")) {
-            if (spelbordMap[y - 1][x].getIsMuur() == false) {
-                if (spelbordMap[y - 1][x].getKist() != null) {
-                    if (spelbordMap[y - 2][x].getIsMuur() == false && spelbordMap[y - 2][x].getKist() == null) {
-                        Kist teVerschuivenKist = spelbordMap[y - 1][x].getKist();
-                        spelbordMap[y - 1][x].setKist(null);
-                        spelbordMap[y - 2][x].setKist(teVerschuivenKist);
-                    } else {
-                        this.undoStack.pop();
-                        return;
-                    }
-                }
-                this.mannetje.setVeld(spelbordMap[y - 1][x]);
-                spelbordMap[y - 1][x].setHetMannetje(mannetje);
-                spelbordMap[y][x].setHetMannetje(null);
-                aantalVerplaatsingen++;
-                succesMovement = true;
-            }
-            if (succesMovement == false) {
-                this.undoStack.pop();
-            }
-            return;
-        }
-
-        if (beweging.equalsIgnoreCase("u")) {
-            if (!undoStack.empty()) {
-                aantalVerplaatsingen--;
-                this.VeldenMetDoel.clear();
-                Veld[][] veldtemp = (Veld[][]) this.undoStack.pop();
-                for (Veld[] row : veldtemp) {
-                    for (Veld col : row) {
-                        if (col != null) {
-                            if (col.getHetMannetje() != null) {
-                                this.mannetje = col.getHetMannetje();
-                            }
-                            if (col.getHeeftDoel()) {
-                                this.VeldenMetDoel.add(col);
-                            }
-                        }
-                    }
-                }
-                this.spelbordMap = veldtemp;
+        if (kanMannetjeVerplaatsen(geefVolgendVak(offset)))
+        {
+            aantalVerplaatsingen++;
+            if (kanKistVerplaatsen(geefVolgendVak(offset), geefVolgendVak(volgendOffset)))
+            {
+                /**
+                 * Kist en mannetje verplaatsen
+                 */
+                verplaatsKist(volgendOffset, offset);
+                verplaats(offset);
+            } else if (!(zitKistVast(geefVolgendVak(offset), geefVolgendVak(volgendOffset))))
+            {
+                /*juist mannetje verplaatsen*/
+                verplaats(offset);
             }
 
-        }
-
-    }
-
-    /**
-     * Cloned de {@link Spelbord#spelbordMap} en zorgt ervoor dat er nieuwe veld
-     * objecten ontstaan met dezelfde waarde, maar een andere referentie.
-     *
-     * @return 2d array 10*10 van {@link Veld}
-     */
-    private Veld[][] deepCopyVeld(Veld[][] origineelMap) {
-        Veld mapcopy[][] = new Veld[10][10];
-        for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < 10; j++) {
-                Veld origineelVeld = origineelMap[i][j];
-                if (origineelVeld == null) {
-                    mapcopy[i][j] = null;
-                } else {
-                    mapcopy[i][j] = new Veld(origineelVeld.getHeeftDoel(), origineelVeld.getIsMuur(), origineelVeld.getX(), origineelVeld.getY(), null, null);
-                    if (origineelVeld.getHetMannetje() != null) {
-                        Mannetje nieuwMannetje = new Mannetje(mapcopy[i][j]);
-                        mapcopy[i][j].setHetMannetje(nieuwMannetje);
-                    }
-                    if (origineelVeld.getKist() != null) {
-                        mapcopy[i][j].setKist(new Kist(null));
-                        mapcopy[i][j].getKist().setVeld(mapcopy[i][j]);
-                    }
-                }
-            }
-        }
-        return mapcopy;
-
-    }
-
-    /**
-     * Checkt of het spelbord voltooid door te kijken of alle kisten op een veld
-     * staan met {@link Veld#heeftDoel} die true zijn staan.
-     *
-     * @return true als het spelbord completed is.
-     * @see Spelbord#VeldenMetDoel
-     */
-    public boolean checkIsVoltooid() {
-        boolean voorAlleKistenOpEenDoel = true;
-        for (Veld v : this.VeldenMetDoel) {
-            if (v.getKist() == null) {
-                voorAlleKistenOpEenDoel = false;
-            }
-        }
-        return voorAlleKistenOpEenDoel;
-    }
-
-    /**
-     * Voegt één velden toe aan de {@link Spelbord#spelbordMap} op basis van de
-     * X/Y coordinaten van het veld object. Als het veld een {@link Mannetje}
-     * bevat in {@link Veld#hetMannetje}, wordt dit object geset in
-     * {@link Spelbord#mannetje}. Als het {@link Veld#heeftDoel} true is, wordt
-     * het veld toegevoegd aan de {@link Spelbord#VeldenMetDoel}
-     *
-     * @param veld
-     */
-    public void voegVeldToeAanNieuwSpelbord(Veld veld) {
-        int x = veld.getX();
-        int y = veld.getY();
-        this.spelbordMap[y][x] = veld;
-        if (veld.getHetMannetje() != null) {
-            this.mannetje = veld.getHetMannetje();
-        }
-        if (veld.getHeeftDoel()) {
-            this.VeldenMetDoel.add(veld);
         }
     }
 
     /**
-     * set het element op Y(rij), X(kolom) op null. Dit wordt dan afgedrukt al
-     * een achtergrond element.
-     *
-     * @param x KOLOM van de 2D array, 0-based.
-     * @param y RIJ van de 2D array, 0-based.
+     * geef volgend Vak in de lijst
+     * @param offset
+     * @return 
      */
-    public void voegAchtergrondToe(int x, int y) {
-        this.spelbordMap[y][x] = null;
+    private Vak geefVolgendVak(int offset)
+    {
+        int positie = (man.getVak().getyCoordinaat() * 10 ) + man.getVak().getxCoordinaat();
+        return vakkenSpelbord.get(positie + offset);
     }
 
     /**
-     * Maakt een nieuw veld aan met correcte bijhorde attributen adv de
-     * Item-parameter. Dit nieuw veld word toegevoegd aan de
-     * {@link Spelbord#spelbordMap} via {@link Spelbord#voegVeldToeAanNieuwSpelbord(domein.Veld)
-     * }
-     *
-     * @param item item waarop de attribuutwaarden van veld gebaseerd zijn.
-     * @param XCOORD KOLOM van de 2D array, 0-based.
-     * @param YCOORD RIJ van de 2D array, 0-based.
+     * verplaatsingen
+     * @param offset 
      */
-    public void plaatsItem(char item, int XCOORD, int YCOORD) {
-        if (this.mannetje != null && XCOORD == this.mannetje.getVeld().getX() && YCOORD == this.mannetje.getVeld().getY()) {
-            this.mannetje.getVeld().setHetMannetje(null);//plaats van mannetje overschrijven
-            this.mannetje.setVeld(null);
-            this.mannetje = null;
-        }
-        if (this.mannetje != null && item == '@') { //tweede mannetje plaatsen
-            this.mannetje.getVeld().setHetMannetje(null);//plaats van mannetje overschrijven
-            this.mannetje.setVeld(null);
-            this.mannetje = null;
-        }
-        if (this.spelbordMap[YCOORD][XCOORD] != null && this.spelbordMap[YCOORD][XCOORD].getHeeftDoel()) {
-            this.VeldenMetDoel.remove(this.spelbordMap[YCOORD][XCOORD]);//plaats van een doel overschrijven
-        }
-        if (item == 'o') {
-            Veld veld = new Veld(true, false, XCOORD, YCOORD, null, null);
-            voegVeldToeAanNieuwSpelbord(veld);
-        } else if (item == 'k') {
-            Kist kist = new Kist(null);
-            Veld veld = new Veld(false, false, XCOORD, YCOORD, null, kist);
-            kist.setVeld(veld);
-            voegVeldToeAanNieuwSpelbord(veld);
-        } else if (item == '#') {
-            Veld veld = new Veld(false, true, XCOORD, YCOORD, null, null);
-            voegVeldToeAanNieuwSpelbord(veld);
-        } else if (item == '.') {
-            Veld veld = new Veld(false, false, XCOORD, YCOORD, null, null);
-            voegVeldToeAanNieuwSpelbord(veld);
-        } else if (item == '@') {
-            if (this.mannetje == null) {
-                Mannetje mannetjeTemp = new Mannetje(null);
-                Veld veld = new Veld(false, false, XCOORD, YCOORD, mannetjeTemp, null);
-                mannetjeTemp.setVeld(veld);
-                voegVeldToeAanNieuwSpelbord(veld);
-            } else {
-                throw new NieuwSpelbordException(labels.getString("geen2Mannetjes"));
-            }
-        } else if (item == '+') {
-            voegAchtergrondToe(XCOORD, YCOORD);
-        } else {
-            throw new NieuwSpelbordException(labels.getString("onbekendSymboolVervang"));
-        }
+    private void verplaats(int offset)
+    {
+        /**
+         * Als er een verplaatsing gebeurt. geven we het hero object door aan het volgend vak en zet we de hero van het vorig vak op null.
+         */
+        geefVolgendVak(offset).setHero(man);
+        geefVolgendVak(0).setHero(null);
+        man.setVak(geefVolgendVak(offset));       
     }
 
     /**
-     * Controleert of het spelbord dat moet worden weggeschreven naar de
-     * database geen fouten bevat. Controle: Er moet een muur staan tussen een
-     * achtergrond en een bespeelbaar veld. Zo kan er ook nooit een
-     * indexOutOfBounds exc. zijn bij {@link Spelbord#verplaatsMannetje(java.lang.String)
-     * }. Er moet een gesloten contuur zijn van muren, er moet minstens 1
-     * mannetje zijn, er moet minsten 1 doel zijn en evenveel kisten als doelen.
-     * Throwed een {@link NieuwSpelbordException} als er een voorwaarde niet
-     * voldaan wordt.
-     *
-     * @return true als alle controles slagen. zal nooit false returnen maar een
-     * {@link NieuwSpelbordException} werpen in andere gevallen.
+     * verplaatsen van kisten
+     * @param vorigePositie
+     * @param positie 
      */
-    public boolean IsCorrectControleSpelbord() {
-        boolean correct = true;
-        for (int i = 0; i < this.spelbordMap.length; i++) {
-            for (int j = 0; j < this.spelbordMap[i].length; j++) {
-                try {
-                    if (this.spelbordMap[i][j] != null && this.spelbordMap[i][j].getIsMuur() == false) { //als het een 'zand' is
-                        if (this.spelbordMap[i - 1][j] == null) {//boven
-                            throw new NieuwSpelbordException(labels.getString("zandNaastGras"));
-                        } else if (this.spelbordMap[i + 1][j] == null) {//onder
-                            throw new NieuwSpelbordException(labels.getString("zandNaastGras"));
-                        } else if (this.spelbordMap[i][j - 1] == null) {//links
-                            throw new NieuwSpelbordException(labels.getString("zandNaastGras"));
-                        } else if (this.spelbordMap[i][j + 1] == null) {//rechts
-                            throw new NieuwSpelbordException(labels.getString("zandNaastGras"));
-                        }
-                    }
-                } catch (IndexOutOfBoundsException e) {
-                    throw new NieuwSpelbordException(labels.getString("zandBuitenkant"));
-                }
-            }
-        }
-
-        for (int i = 0; i < this.spelbordMap.length; i++) { //1rij vastpakken
-            int x = 0;
-            boolean heeftMuurLinks = false;
-            if (bevatEenZandVeld(i, -1)) {
-                for (int j = 0; j < this.spelbordMap[i].length; j++) { //rij van links naar rechts afgaan
-                    if (this.spelbordMap[i][j] != null && this.spelbordMap[i][j].getIsMuur()) {
-                        heeftMuurLinks = true;
-                        x = j;
-                    }
-                }
-                if (heeftMuurLinks == false) {
-                    throw new NieuwSpelbordException(labels.getString("geenGeslotenRand"));
-                }
-                boolean heeftMuurRechts = false;
-                for (int k = this.spelbordMap[i].length - 1; k >= 0; k--) { //rij van rechts naar links afgaan
-                    if ((this.spelbordMap[i][k] != null && this.spelbordMap[i][k].getIsMuur() && k != x)) { //heeft 2 verschillende muren
-                        heeftMuurRechts = true;
-                    }
-                }
-                if (heeftMuurRechts == false) {
-                    throw new NieuwSpelbordException(labels.getString("geenGeslotenRand"));
-                }
-
-            }
-        }
-
-        for (int i = 0; i < 10; i++) { //1 kolom vastpakken
-            int y = 0;
-            boolean heeftMuurBoven = false;
-            if (bevatEenZandVeld(-1, i)) {
-                for (int j = 0; j < 10; j++) { //rij van links naar rechts afgaan
-
-                    if (this.spelbordMap[j][i] != null && this.spelbordMap[j][i].getIsMuur()) {
-                        heeftMuurBoven = true;
-                        y = j;
-                    }
-
-                }
-                if (heeftMuurBoven == false) {
-                    throw new NieuwSpelbordException(labels.getString("geenGeslotenRand"));
-                }
-
-                boolean heeftMuurOnder = false;
-                for (int k = 9; k >= 0; k--) { //rij van rechts naar links afgaan
-
-                    if ((this.spelbordMap[k][i] != null && this.spelbordMap[k][i].getIsMuur() && k != y)) { //heeft 2 verschillende muren
-                        heeftMuurOnder = true;
-                    }
-
-                }
-                if (heeftMuurOnder == false) {
-                    throw new NieuwSpelbordException(labels.getString("geenGeslotenRand"));
-                }
-
-            }
-        }
-        if (this.mannetje == null) {
-            throw new NieuwSpelbordException(labels.getString("geenMannetje"));
-        }
-
-        if (this.VeldenMetDoel.isEmpty()) {
-            throw new NieuwSpelbordException(labels.getString("minstenEenDoel"));
-        }
-
-        if (geefAantalKisten() != this.VeldenMetDoel.size()) {
-            throw new NieuwSpelbordException(labels.getString("kistenEnDoelenOngelijk"));
-        }
-
-        return correct;
-    }
-
-    private boolean bevatEenZandVeld(int rij, int kol) {//over een rij iteren= rij megeven, kol = -1. en omgekeerd.
-        boolean bevatZand = false;
-        if (rij != -1) {
-            for (int i = 0; i < 10; i++) {
-                if (this.spelbordMap[rij][i] != null && this.spelbordMap[rij][i].getIsMuur() == false) {
-                    bevatZand = true;
-                }
-            }
-        } else if (kol != -1) {
-            for (int i = 0; i < 10; i++) {
-                if (this.spelbordMap[i][kol] != null && this.spelbordMap[i][kol].getIsMuur() == false) {
-                    bevatZand = true;
-                }
-            }
-        } else {
-            throw new IllegalArgumentException();
-        }
-        return bevatZand;
+    private void verplaatsKist(int vorigePositie, int positie)
+    {
+        /**
+         * Als een kist kan verplaatsen, geven we het kist object door
+         */
+        //geefVolgendVak(vorigePositie).setKist(geefVolgendVak(positie).getKist());
+        Kist kist = geefVolgendVak(positie).getKist();
+        kist.setVak(geefVolgendVak(vorigePositie));
+        geefVolgendVak(vorigePositie).setKist(kist);
+        geefVolgendVak(positie).setKist(null);
     }
 
     /**
-     *
-     * @return het aantal doelen op het spelbord
+     * kijken of het mannetje kan verplaatsen
+     * @param vak
+     * @return 
      */
-    public int geefAantalDoelen() {
-        return VeldenMetDoel.size();
+    private boolean kanMannetjeVerplaatsen(Vak vak)
+    {
+        /**
+         * kijken of we niet botsen op een muur
+         */
+        return (vak.isBewandelbaar());
     }
 
     /**
-     *
-     * @return het aantal kisten op het spelbord.
+     * kijken of de kist kan verplaatsen
+     * @param vak
+     * @param volgendVak
+     * @return 
      */
-    public int geefAantalKisten() {
+    private boolean kanKistVerplaatsen(Vak vak, Vak volgendVak)
+    {
+        /**
+         * Eerst kijken of het vak waar het mannetje naartoe gaat wel ene kist bevat, zoniet return we false
+         */
+        if (vak.bevatKist())
+        {
+            /**
+             * als het vak een kist bevat gaan we kijken of het vak waar de kist naartoe gaat, dat er wel plaats is om te verplaatsen
+             */
+            return (volgendVak.isBewandelbaar()) && !volgendVak.bevatKist();
+        }
+
+        return false;
+    }
+
+    /**
+     * Kijken of de kist vast zit
+     * @param vak
+     * @param volgendVak
+     * @return 
+     */
+    private boolean zitKistVast(Vak vak, Vak volgendVak)
+    {
+        return vak.bevatKist() && (!volgendVak.isBewandelbaar() || volgendVak.bevatKist());
+    }
+
+    /**
+     * kijken of het spelbord voltooid is
+     * @return 
+     */
+    public boolean isSpelbordVoltooid()
+    {
         int aantal = 0;
-        for (Veld[] rij : spelbordMap) {
-            for (Veld col : rij) {
-                if (col != null && col.getKist() != null) {
-                    aantal++;
+        int aantalDoelen = 0;
+
+        for (Vak vak : vakkenSpelbord)
+        {
+            if (vak.isBewandelbaar())
+            {
+                /**
+                 * Hier gaan we op zoek hoeveel doelen er zijn en hoveel doelen ook kisten bevatten
+                 */
+                VakWandel vakW = (VakWandel) vak;
+                if (vakW.isIsDoel())
+                {
+                    aantalDoelen++;
+
+                    if (vakW.bevatKist())
+                    {
+                        aantal++;
+                    }
                 }
+
             }
         }
 
-        return aantal;
+        /**
+         * Als de aantal doelen gelijk is aan de aantal doelen met een kist dan zetten we het spelbord op voltooid en returnen we true zodat ons spel kan afgesloten worden
+         */
+        if (aantal == aantalDoelen)
+        {
+            setVoltooid(true);
+        }
+
+        return isVoltooid();
     }
+
+    /**
+     * geeft een vak op een bepaalde positie
+     * @param col
+     * @param row
+     * @return 
+     */
+    public Vak geefVakOpPositie(int col, int row)
+    {
+        int positie = (row*10) + col; 
+        return vakkenSpelbord.get(positie);
+    }
+    
+    
+    /**
+     * Volgende methodes enkel gebruiken bij het in laden van textfile in de Database
+     */
+    public void maakBord(String keuzeSpel) throws FileNotFoundException
+    {
+        /**
+         * Dit deel zal elke lijn uit de txt-file achtereenvolgens in een String plaatsen, deze wordt later omgezet in een dubbele array.
+         */
+        Scanner input = new Scanner(new File("maps/easy2.txt"));//.useDelimiter(",\\s*");
+        String woord = "";
+        String spelbordElement = "";
+        Character[][] vakken = new Character[10][10];
+
+        String naamSpelbord = input.nextLine();
+
+        while (input.hasNextLine())
+        {
+            String line = input.nextLine();
+            Scanner word = new Scanner(line);
+            while (word.hasNext())
+            {
+                spelbordElement += word.next();
+            }
+            word.close();
+        }
+
+        /**
+         * Dit deel zal elk karakter van de string in een dubbele array plaatsen.
+         */
+        for (int i = 0; i < vakken.length; i++)
+        {
+            for (int j = 0; j < vakken[i].length; j++)
+            {
+                vakken[i][j] = spelbordElement.charAt((i * 10) + j);
+            }
+        }
+        zetVakkenInDatabase(keuzeSpel, naamSpelbord, vakken);
+    }
+    
+    /**
+     * wijizig spelNaam
+     * @param orgNaam
+     * @param spelNaam 
+     */
+    public void wijzigSpelNaam(String orgNaam, String spelNaam)
+    {
+        vakMapper = new VakMapper();
+        spelbordmapper = new SpelbordMapper();
+        
+        vakMapper.wijzigSpelNaam(orgNaam, spelNaam);
+        spelbordmapper.wijzigSpelNaam(orgNaam, spelNaam);
+    }
+    
+    /**
+     * wijzig spelbordnaam
+     * @param spelbordNaam 
+     */
+    public void wijzigSpelbordNaam(String spelbordNaam)
+    {
+        vakMapper = new VakMapper();
+        KistMapper kistMap = new KistMapper();
+        MannetjeMapper manMap = new MannetjeMapper();
+        spelbordmapper = new SpelbordMapper();
+        
+        vakMapper.wijzigSpelbordNaam(getNaam(), spelbordNaam);
+        kistMap.wijzigSpelbordNaam(getNaam(), spelbordNaam);
+        manMap.wijzigSpelbordNaam(getNaam(), spelbordNaam);
+        spelbordmapper.wijzigSpelbordNaam(getNaam(), spelbordNaam);
+    }
+    
+    /**
+     * een gewijzgd spelbord in de database plaatsen
+     * @param spelnaam
+     * @param spelbordNaam 
+     */
+    public void zetGewijzigdSpelbordInDatabase(String spelnaam, String spelbordNaam)
+    {
+        vakMapper = new VakMapper();
+        spelbordmapper = new SpelbordMapper();
+        KistMapper kistMap = new KistMapper();
+        MannetjeMapper manMap = new MannetjeMapper();
+        
+        
+        kistMap.deleteKisten(spelbordNaam);
+        manMap.deleteMannetje(spelbordNaam);     
+        vakMapper.deleteVakken(spelnaam, spelbordNaam);
+        spelbordmapper.deleteSpelbord(spelnaam, spelbordNaam);
+        
+        
+        
+        zetSpelbordInDatabase(spelnaam, spelbordNaam);
+    }
+    
+    /**
+     * deleten van het spelbord
+     * @param spelNaam 
+     */
+    public void deleteSpelbord(String spelNaam)
+    {
+        String spelbordNaam = getNaam();
+        vakMapper = new VakMapper();
+        spelbordmapper = new SpelbordMapper();
+        KistMapper kistMap = new KistMapper();
+        MannetjeMapper manMap = new MannetjeMapper();
+        
+        kistMap.deleteKisten(spelbordNaam);
+        manMap.deleteMannetje(spelbordNaam);     
+        vakMapper.deleteVakken(spelNaam, spelbordNaam);
+        spelbordmapper.deleteSpelbord(spelNaam, spelbordNaam);
+    }
+    
+    /**
+     * Het spelbord wordt geplaatst in de database
+     * @param spelNaam
+     * @param naamSpelbord 
+     */
+    public void zetSpelbordInDatabase(String spelNaam,String naamSpelbord)
+    {
+        vakMapper = new VakMapper();
+        spelbordmapper = new SpelbordMapper();
+        KistMapper kistMap = new KistMapper();
+        MannetjeMapper manMap = new MannetjeMapper();
+        int x=0;
+        int y=0;
+        
+        spelbordmapper.voegSpelbordToe(naamSpelbord, spelNaam);
+        for(Vak vak: vakkenSpelbord)
+        {
+            x = vak.getxCoordinaat();
+            y = vak.getyCoordinaat();
+                      
+            if(vak.isBewandelbaar()) 
+            {            
+                VakWandel vakwandel = (VakWandel)vak;
+                    if(vakwandel.bevatKist())
+                    {
+                        vakMapper.voegVakToe(3, x + (10*y), spelNaam, naamSpelbord);
+                        kistMap.voegKistToe(x + (10*y), naamSpelbord);
+                    }
+                    else if(vakwandel.bevatMannetje())
+                    {
+                        vakMapper.voegVakToe(6, x + (10*y), spelNaam, naamSpelbord);
+                        manMap.voegMannetjeToe(x + (10*y), naamSpelbord);
+                    }
+                    else if(vakwandel.isIsDoel())
+                    {
+                        vakMapper.voegVakToe(4, x + (10*y), spelNaam, naamSpelbord);
+                    }
+                    else
+                        vakMapper.voegVakToe(1, x + (10*y), spelNaam, naamSpelbord);                     
+                                 
+            }
+            else if(!vak.isBewandelbaar())
+            {
+                vakMapper.voegVakToe(2, x + (10*y), spelNaam, naamSpelbord);
+            }
+        }
+    }
+    
+    /**
+     * Deze methode zal de spelbordarray overlopen en elk vakje in de db plaatsen. Hiervoor hebben we een id, x-en y-coordinaat, naam van het spel als de naam van het spelbord nodig.
+     *
+     * @param keuzeSpel
+     */
+    public void zetVakkenInDatabase(String keuzeSpel, String naamSpelbord, Character[][] vakken)
+    {
+        vakMapper = new VakMapper();
+        KistMapper kistMap = new KistMapper();
+        MannetjeMapper manMap = new MannetjeMapper();
+
+        for (int i = 0; i < vakken.length; i++)
+        {
+            for (int j = 0; j < vakken[i].length; j++)
+            {
+                switch (vakken[i][j])
+                {
+                    case '_':
+                        // de methode oproepen die een vakje in de db maakt met als parameters de ID, x-en y-coordinaat
+                        vakMapper.voegVakToe(1, j + (10 * i), keuzeSpel, naamSpelbord);
+                        break;
+                    case '#':
+                        vakMapper.voegVakToe(2, j + (10 * i), keuzeSpel, naamSpelbord);
+                        break;
+                    case '$':
+                        vakMapper.voegVakToe(3, j + (10 * i), keuzeSpel, naamSpelbord);
+                        kistMap.voegKistToe(j + (10 * i), naamSpelbord);
+                        break;
+                    case '.':
+                        vakMapper.voegVakToe(4, j + (10 * i), keuzeSpel, naamSpelbord);
+                        break;
+                    case '*':
+                        vakMapper.voegVakToe(5, j + (10 * i), keuzeSpel, naamSpelbord);
+                        break;
+                    case '@':
+                        vakMapper.voegVakToe(6, j + (10 * i), keuzeSpel, naamSpelbord);
+                        manMap.voegMannetjeToe(j + (10 * i), naamSpelbord);
+                        break;
+                }
+            }
+        }
+    }
+
+    /**
+     * geeft de originele spelborden
+     * @param spelnaam
+     * @return 
+     */
+    public List<Spelbord> geefOrigineleSpelborden(String spelnaam)
+    {
+        spelbordmapper = new SpelbordMapper();
+        return spelbordmapper.geefSpelborden(spelnaam);
+    }
+    
+    /**
+     * gaat kijken of het spelbord bestaat
+     * @param naam
+     * @return 
+     */
+    public boolean bestaatSpelbord(String naam)
+    {
+        List<Spelbord> spelborden;
+        spelbordmapper = new SpelbordMapper();
+        if(!naam.isEmpty())
+            spelborden = spelbordmapper.geefAlleSpelborden();
+        else    
+            spelborden = spelbordmapper.geefSpelborden("custommap");
+        for(Spelbord spelbord: spelborden)
+        {
+            if(spelbord.getNaam().equals(naam))
+                return true;
+        }
+        return false;
+    }
+
 }

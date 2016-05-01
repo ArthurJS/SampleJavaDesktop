@@ -1,59 +1,74 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package domein;
 
-import java.util.*;
-import persistentie.*;
+import java.util.List;
+import persistentie.SpelMapper;
 
 /**
  *
- * @author Mario
+ * @author donovandesmedt
  */
-public class SpelRepository {
+public class SpelRepository
+{
 
-    //private Collection<Spel> alleSpellen;
-    private final SpelMapper spelMapper;
-    //private List<String> alleSpelNamen;
+    private List<Spel> spelen;
+    private SpelMapper spelMapper;
 
     /**
-     *Constructor van SpelRepository die een nieuw SpelRepository object aanmaakt en
-     * toekent aan het klasse attribuut {@link SpelMapper#SpelMapper() }
+     * constructor
      */
-    public SpelRepository() {
+    public SpelRepository()
+    {
         spelMapper = new SpelMapper();
+        spelen = spelMapper.geefSpelen();
     }
 
     /**
-     * Geeft de lijst terug van alle spelnamen adhv het spelMapper object
-     * @return
-     */
-    public List<String> geefSpelnamen() {
-        return spelMapper.geefSpelNamen();
-    }
-
-    /**
-     * Geeft het geselecteerde spel terug adhv {@link SpelMapper#geefGeselecteerdSpel(java.lang.String)}
-     * @param spelNaam
+     * geef de lijst met spelen
      * @return 
-     * Spel met overeenkomstige spelnaam
      */
-    public Spel geefGeslecteerdSpel(String spelNaam) {
-        return spelMapper.geefGeselecteerdSpel(spelNaam);
+    public List<Spel> geefLijstSpelen()
+    {
+        return spelen;
     }
     
     /**
-     * Geeft het totaal aantal spelborden terug van de in GUI gekozen spel
-     * @param spelnaam de naam van het gewenste te retouren spel
-     * @return
-     * aantal spelborden (int) adhv {@link SpelMapper#geefTotaalAantalSpelbordenVanInGuiGekozenSpel(java.lang.String)  }
+     * geef de custom spel
+     * @return 
      */
-    public int geefTotaalAantalSpelbordenVanInGuiGekozenSpel(String spelnaam){
-        return spelMapper.geefTotaalAantalSpelbordenVanInGuiGekozenSpel(spelnaam);
+    public List<Spelbord> geefLijstCustomSpelen()
+    {
+        return spelMapper.geefLijstCustomSpelen();
     }
 
     /**
-     * Registreert het nieuw aangemaakte spel adhv {@link SpelMapper#registreerNieuwSpel(domein.Spel)  }
-     * @param nieuwSpel te registreren spel
+     * geef spel
+     * @param naam
+     * @return 
      */
-    public void registreerNieuwSpel(Spel nieuwSpel){
-        spelMapper.registreerNieuwSpel(nieuwSpel);
+    public Spel geefSpel(String naam)
+    {
+        Spel spel = null;
+        for(Spel s: spelen)
+        {
+            if(naam.equals(s.getNaam()))
+            {
+              spel=s;
+              break;
+            }
+        }
+
+        if (spel != null)
+        {
+            return spel;
+        } else
+        {
+            throw new IllegalArgumentException("Spel in spelRepository is nog niet geinitialiseerd");
+        }
     }
+    
 }

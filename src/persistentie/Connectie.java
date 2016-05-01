@@ -3,14 +3,14 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package persistentie;
 
 /**
- *
- * @author Thibault Fouquaert
+ * Deze klasse worgt ervoor dat er een connectie wordt gedaan met de database
+ * @author donovandesmedt
  */
-public class Connectie 
+public class Connectie
 {
-    public static final String JDBC_URL = "jdbc:mysql://localhost:3306/sokoban?user=root&password=";
+
+    public static final String jbl = ("jdbc:mysql://localhost:3306/sokobandb?user=root&password=toor");
 }

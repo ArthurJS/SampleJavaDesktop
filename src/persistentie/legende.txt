@@ -1,0 +1,6 @@
+LEGENDE:
+    # = muur
+    $ = box
+    @ = player
+    . = doel waar de box moet komen
+    * = doel waar de box reeds is

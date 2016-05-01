@@ -1,486 +1,738 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package domein;
 
-import static LanguageResources.Resource.labels;
-import exceptions.GebruikersNaamException;
-import exceptions.WachtwoordException;
-import exceptions.WachtwoordHerhaalException;
-import java.util.*;
+import java.io.FileNotFoundException;
+import java.util.List;
+import resources.ResourceHandling;
 
 /**
  *
- * @author Thibault Fouquaert
+ * @author donovandesmedt
  */
-public class DomeinController {
+public class DomeinController
+{
 
-    private Speler deSpeler;
-    private final SpelerRepository spelerRep;
+    private SpelerRepository spelerRepo;
+    private SpelRepository spelRepo;
+    private Speler speler;
     private Spel spel;
-    private Spel nieuwSpel;
-    private final SpelRepository spelRep;
+    private ConfigureerSpel configureerSpel;
+    private String keuzeSpel;
+    private boolean isConsole;
+    private String[] lijstSpelen;
 
-    /**
-     * Constructor die een nieuwe SpelerRepository en SpelRepository aanmaakt en
-     * toekent aan de klasse attributen.<p/>
-     * {@link SpelerRepository#SpelerRepository()}
-     * {@link SpelRepository#SpelRepository()}
-     */
-    public DomeinController() {
-        spelerRep = new SpelerRepository();
-        spelRep = new SpelRepository();
+    /** contructor */
+    public DomeinController()
+    {
+        /**
+         * aanmaken repositories
+         */
+        spelerRepo = new SpelerRepository();
+        //spelRepo = new SpelRepository();
+        configureerSpel = new ConfigureerSpel();
+
+        isConsole = false;
     }
 
     /**
-     * Maakt een nieuw {@link Speler} object voor registratie. Indien Wachtwoord
-     * en wachtwoordBevestiging gelijk zijn: Set de speler met {@link #setSpeler(domein.Speler)
-     * } in het klasse attribuut van de DC en laat het toevoegen aan de Database
-     * met {@link SpelerRepository#voegToe(domein.Speler) }. Anders throwed deze
-     * methode een {@link exceptions.WachtwoordException}.
-     *
-     * @param voornaam Voornaam van de speler, mag null zijn.
-     * @param achternaam Achternaam van de speler, mag null zijn.
-     * @param gebruikersnaam Gebruikersnaam van de speler. Verplicht en uniek.
-     * @param wachtwoord Wachtwoord van de speler, wordt gecontroleerd met {@link Speler#setWachtwoord(java.lang.String)
-     * } en {@link Speler#validate(java.lang.String) }.
-     * @param wachtwoordBevestiging Moet gelijk zijn aan het wachtwoord voor
-     * verder te gaan.
+     * setten als we in console zitten
+     * @param isConsole 
      */
-    public void registreer(String voornaam, String achternaam, String gebruikersnaam, String wachtwoord, String wachtwoordBevestiging) {
-        Speler nieuweSpeler = new Speler(voornaam, achternaam, gebruikersnaam, wachtwoord);
-        if (!wachtwoord.equals(wachtwoordBevestiging)) {//exceptie van wachtwoord moeten getrowd worden voor de de herhalingsfout.
-            throw new WachtwoordHerhaalException(labels.getString("foutieveBevestiging"));
-        }
-        spelerRep.voegToe(nieuweSpeler);
+    public void setIsConsole(boolean isConsole)
+    {
+        this.isConsole = isConsole;
+    }
+
+    /**
+     * geef de speler
+     * @return 
+     */
+    public String geefSpeler()
+    {
+        return speler.getVoornaam();
+    }
+
+    /**
+     * is speler beheerder
+     * @return 
+     */
+    public boolean isSpelerBeheerder()
+    {
+        return speler.isBeheerder();
+    }
+
+    /**
+     * aanmelden van speler
+     * @param gebruikersnaam
+     * @param wachtwoord 
+     */
+    public void meldAan(String gebruikersnaam, String wachtwoord)
+    {
+        /**
+         * meld speler aan en haal hem op uit de repository
+         */
+        Speler gevondenSpeler = spelerRepo.geefSpeler(gebruikersnaam, wachtwoord);
+        setSpeler(gevondenSpeler);
+    }
+
+    /**
+     * registreren van nieuwe speler
+     * @param gebruikersnaam
+     * @param voornaam
+     * @param achternaam
+     * @param wachtwoord 
+     */
+    public void registreer(String gebruikersnaam, String voornaam, String achternaam, String wachtwoord)
+    {
+        /**
+         * maak een nieuwe speler aan en meld hem aan
+         */
+        Speler nieuweSpeler = new Speler(gebruikersnaam, voornaam, achternaam, wachtwoord);
+        spelerRepo.voegToe(nieuweSpeler);
         setSpeler(nieuweSpeler);
     }
 
     /**
-     * Meld de speler aan in de applicatie door de speler te setten in de DC met {@link #setSpeler(domein.Speler)
-     * }
-     * throwed een {@link exceptions.WachtwoordException} als het wachtwoord
-     * niet overeenkomt met de gebruikersnaam.
-     *
-     * @param gebruikersnaam opgegeven gebruikersnaam
-     * @param wachtwoord opgegeven wachtwoord
-     * @see SpelerRepository#geefSpeler(java.lang.String, java.lang.String)
+     * sette, van de speler
+     * @param speler 
      */
-    public void meldtAan(String gebruikersnaam, String wachtwoord) {
-        Speler gevondenSpeler = spelerRep.geefSpeler(gebruikersnaam, wachtwoord);
-        if (gevondenSpeler != null) {
-            setSpeler(gevondenSpeler);
-        } else {
-            throw new WachtwoordException(labels.getString("incorrectWachtwoord"));
+    private void setSpeler(Speler speler)
+    {
+        //** instellen van aangemelde speler */
+        if (speler != null)
+        {
+            this.speler = speler;
+        } else
+        {
+            throw new IllegalArgumentException(ResourceHandling.getInstance().getString("Exception.speler"));
         }
     }
 
     /**
-     * Throwed een nieuwe {@link GebruikersNaamException} als er geen speler is
-     * aangemeld/geset.
-     *
-     * @return De gebruikersnaam van de aangemelde speler.
+     * geef de lijst van spelen door
+     * @return 
      */
-    public String geefGebruikersnaam() {
-        if (deSpeler != null) {
-            return deSpeler.getGebruikersnaam();
-        } else {
-            throw new GebruikersNaamException(labels.getString("gegevensNietCorrect"));
+    public String[] geefLijstSpelen()
+    {
+        /**
+         * String array aanmaken voor het opvangen van spelnamen
+         */
+        spelRepo = new SpelRepository();
+        List<Spel> lijstSpelObjecten = spelRepo.geefLijstSpelen();
+        lijstSpelen = new String[lijstSpelObjecten.size()];
+
+        /**
+         * String array invullen
+         */
+        for (int index = 0; index < lijstSpelen.length; index++)
+        {
+            lijstSpelen[index] = lijstSpelObjecten.get(index).getNaam();
+        }
+
+        /**
+         * Return van String array
+         */
+        return lijstSpelen;
+    }
+
+    /**
+     * geven van de custom spelen
+     * @return 
+     */
+    public String[] geefCustomSpelen()
+    {
+
+        List<Spelbord> lijstCustomspelObjecten = spelRepo.geefLijstCustomSpelen();
+        String[] lijstCustomSpelen = new String[lijstCustomspelObjecten.size()];
+
+        for (int index = 0; index < lijstCustomSpelen.length; index++)
+        {
+            lijstCustomSpelen[index] = lijstCustomspelObjecten.get(index).getNaam();
+        }
+        return lijstCustomSpelen;
+    }
+
+    /**
+     * spel kiezen
+     * @param naam
+     * @param custom 
+     */
+    public void kiesSpel(String naam, boolean custom)
+    {
+        keuzeSpel = naam;
+        /**
+         * Gekozen spel wordt bijgehouden
+         */
+
+        if (!custom)
+        {
+            stelSpelIn(spelRepo.geefSpel(naam));
+            zoekNietVoltooidSpelbord();
+        } else
+        {
+            stelSpelIn(spelRepo.geefSpel("custommap"));
+            setSpelbord(naam);
+        }
+
+    }
+
+    /**
+     * setten van het spelbord
+     * @param naam 
+     */
+    public void setSpelbord(String naam)
+    {
+        List<Spelbord> spelborden = spel.getSpelborden();
+        for (Spelbord spelbord : spelborden)
+        {
+            if (spelbord.getNaam().equals(naam))
+            {
+                spel.setSpelbord(spelbord);
+                configureerSpel.setLeegSpelbord(spelbord);
+            }
         }
     }
 
     /**
-     * Throwed een nieuwe {@link GebruikersNaamException} als er geen speler is
-     * aangemeld/geset.
-     *
-     * @return true als de speler adminrechten heeft. False indien dit niet zo
-     * is.
+     * setten van het spel
+     * @param naam 
      */
-    public boolean geefAdminrechten() {
-        if (deSpeler != null) {
-            return deSpeler.getIsAdmin();
-        } else {
-            throw new GebruikersNaamException(labels.getString("gegevensNietCorrect"));
+    public void setSpel(String naam)
+    {
+        spelRepo = new SpelRepository();
+        List<Spel> spelen = spelRepo.geefLijstSpelen();
+        for (Spel spel : spelen)
+        {
+            if (spel.getNaam().equals(naam))
+            {
+                stelSpelIn(spel);
+                configureerSpel = new ConfigureerSpel();
+                configureerSpel.setLeegSpel(spel);
+            }
+        }
+
+    }
+
+    /**
+     * de naam van het gekozen spelbord geven
+     * @return 
+     */
+    public String geefGekozenSpelbord()
+    {
+        return spel.getSpelbord().getNaam();
+    }
+
+    /**
+     * opzoek gaan naar een niet voltooid spelbord
+     */
+    public void zoekNietVoltooidSpelbord()
+    {
+        spel.zoekNietVoltooidSpelbord();
+    }
+
+    /**
+     * spel instellen
+     * @param spel 
+     */
+    private void stelSpelIn(Spel spel)
+    {
+        /**
+         * instellen van gekozen spel
+         */
+        if (spel != null)
+        {
+            this.spel = spel;
+        } else
+        {
+            throw new IllegalArgumentException(ResourceHandling.getInstance().getString("Exception.spel"));
         }
     }
 
     /**
-     *
-     * @param deSpeler
+     * geven van het gesette spel
+     * @return 
      */
-    public void setSpeler(Speler deSpeler) {
-        this.deSpeler = deSpeler;
+    public String geefSpel()
+    {
+        return spel.getNaam();
     }
 
     /**
-     * Throwed een new NullpointerException als er geen namen kunnen worden
-     * opgehaald uit de database.
-     *
-     * @return een List met alle namen v.d. spellen die in de Database zitten.
-     * @see SpelRepository#geefSpelnamen()
+     * spel geven dat geconfigureerd moet worden
+     * @return 
      */
-    public List<String> geefNaamSpellen() {
-        List<String> spelNamen = spelRep.geefSpelnamen();
-        if (spelNamen != null) {
-            return spelNamen;
-        } else {
-            throw new NullPointerException(labels.getString("lijstNietGevonden"));
+    public String geefConfigureerSpel()
+    {
+        return configureerSpel.getLeegSpel().getNaam();
+    }
+
+    /**
+     * spelbord geven dat geconfigureerd moet worden
+     * @return 
+     */
+    public String geefConfigureerSpelbord()
+    {
+        return configureerSpel.getLeegSpelbord().getNaam();
+    }
+
+    /**
+     * deze methode zal de namen van alle beschikbare spelborden van het gekozen spel weergeven, waarna de speler een spelbord moet kiezen
+     *
+     * @param gekozenspel
+     */
+    // domeincontroller kent spebordRepo niet maar heb geen idee hoe ik anders die lijst van spelborden kan afdrukken
+    public String[] geefLijstSpelborden(String gekozenspel)
+    {
+        return spel.geefLijstSpelborden(gekozenspel);
+    }
+
+    /**
+     * deze methode zal het gekozen spelbord teruggeven
+     */
+    public String[][] geefSpelbord()
+    {
+        /**
+         * Deze methode zal van elk vak het id vragen en op basis van het id een spelbord maken.
+         */
+        Spelbord gekozenSpelbord = spel.getSpelbord();
+        return zetSpelbordOm(gekozenSpelbord);
+    }
+
+    /**
+     * spelbord wordt omgezet
+     * @param spelbord
+     * @return 
+     */
+    private String[][] zetSpelbordOm(Spelbord spelbord)
+    {
+        List<Vak> vakken = spelbord.geefVakken();
+        String[][] spelbordString = new String[vakken.size() / 10][vakken.size() / 10];
+
+        for (int i = 0; i < spelbordString.length; i++)
+        {
+            for (int j = 0; j < spelbordString[i].length; j++)
+            {
+                int positie = 10 * i + j;
+                spelbordString[i][j] = vulIn(vakken, positie);
+            }
         }
+        return spelbordString;
     }
-
+    
     /**
-     *
-     * @return dubbele array van chars, dat het spelbord voorstelt. Dit spelbord
-     * is in de staat hoe het in de database zit. wordt gebruikt voor het
-     * RESETTEN van het spelbord.
-     * @see Spel#geefSpelbordInGebruikInit()
+     * lijst met items geven
+     * @return 
      */
-    public char[][] geefSpelbordInGebruikInit() {
-        return spel.geefSpelbordInGebruikInit();
-    }
-
-    /**
-     * laat een spel ophalen uit de batabase door {@link SpelRepository#geefGeslecteerdSpel(java.lang.String)
-     * }, en set het in de domeincontroller indien er een spel gevonden is met
-     * {@link #setSpel(domein.Spel)}. Kan een NullPointyerException throwen als
-     * er geen spel gevonden is met de opgegeven spelnaam.
-     *
-     * @param spelNaam de naam van het spel in de Database, hoofdletter
-     * ongevoelig.
-     */
-    public void selecteerSpel(String spelNaam) {
-        Spel geselecteerdSpel = spelRep.geefGeslecteerdSpel(spelNaam); //geselecteerdSpel = huidig spel
-        if (geselecteerdSpel != null) {
-            setSpel(geselecteerdSpel);
-        } else {
-            throw new NullPointerException(labels.getString("foutieveSpelnaam"));
+    public String[] geefLijstItems()
+    {
+        List<Vak> items = configureerSpel.geefLijstItems();
+        String [] lijstItems = new String[items.size()];
+        isConsole = true;
+        for(int i=0; i<items.size(); i++)
+        {
+            lijstItems[i] = vulIn(items, i);
         }
+        isConsole = false;
+        return lijstItems;
     }
 
     /**
-     * Set het spel in de DC.
-     *
-     * @param geselecteerdSpel het geseleceteerde spel opgehaald uit de
-     * domeincController
-     * @see #selecteerSpel(java.lang.String)
+     * is de muur op de rand
+     * @param vak
+     * @return 
      */
-    public void setSpel(Spel geselecteerdSpel) {
-        this.spel = geselecteerdSpel;
+    private boolean isMuurRand(Vak vak)
+    {
+        /**
+         * Kijken of de muur wel een rand is
+         */
+        return vak.isBewandelbaar(); //instanceof VakWandel;
     }
 
     /**
+     * DomeinController vraagt aan spel de naam van het laatste voltooide spelbord
      *
-     * @return Het spelbord, in een 2d array van chars, waarmee momenteel
-     * gespeeld/gewijzig word van het huidig geselecteerde spel. Elke char stelt
-     * een symbool voor op de respectievelijke x-y plaats.
+     * @return
      */
-    public char[][] geefSpelbordInGebruik() {
-        return spel.geefSpelbordInGebruik();
+    public String toonAantal()
+    {
+        return spel.toonAantal();
     }
 
     /**
-     *
-     * @return Het aantal voltooide spelborden waarmee momenteel
-     * gespeeld/gewijzig word van het huidig geselecteerde spel.
+     * kijken of er verder gespeelt moet worden
+     * @param keuze
+     * @return 
      */
-    public int geefAantalVoltooideSpelborden() {
-        return spel.geefAantalVoltooideSpelborden();
+    public boolean speelVerder(String keuze)
+    {
+        /**
+         * spelbord tonen en vragen wilt u verder spelen of niet, bij wel wordt het keuzemenu opnieuw getoont
+         */
+        return spel.speelVerder(keuze);
     }
 
     /**
-     *
-     * @return Het aantal spelborden van het geselecteerde spel.
+     * is het spel op zijn einde?
+     * @return 
      */
-    public int geefTotaalAantalSpelborden() {
-        return spel.geefTotaalAantalSpelborden();
+    public boolean isEindeSpel()
+    {
+        /**
+         * bij speelverder false dan wordt spel beëindigt
+         */
+        return spel.isEindeSpel();
     }
 
     /**
-     *
-     * @param spelnaam Naam die in de database voorkomt.
-     * @return Het aantal spelborden van het spel met als spelnaam de parameter.
-     * Dit is om een overzicht te kunnen geven hoeveel spelborden elk spel heeft
-     * indien er nog geen spel geselecteerd is.
+     * kijken of het spelbord voltooid is
+     * @return 
      */
-    public int geefTotaalAantalSpelbordenVanInGuiGekozenSpel(String spelnaam) {
-        return spelRep.geefTotaalAantalSpelbordenVanInGuiGekozenSpel(spelnaam);
+    public boolean isSpelbordVoltooid()
+    {
+        /**
+         * Return of het spel voltooid is of niet
+         */
+        return spel.isSpelbordVoltooid();
     }
 
     /**
-     *
-     * @return het aantal verplaatsingne van het geseleceteerde spel.
+     * verplaatsen van de hero
+     * @param richting 
      */
-    public int geefAantalVerplaatsingen() {
+    public void verplaatsHero(String richting)
+    {
+        /**
+         * verplaatsen van de hero
+         */
+        spel.verplaatsHero(richting.charAt(0));
+    }
+
+    /**
+     * vergeten wachtwoord geven
+     * @param gebruikersnaam
+     * @return 
+     */
+    public String wachtwoordVergeten(String gebruikersnaam)
+    {
+        return spelerRepo.wachtwoordVergeten(gebruikersnaam);
+    }
+
+    /**
+     * reseten van spelbord
+     */
+    public void Reset()
+    {
+        /**
+         * Resetten van het spelbord
+         */
+        spel.Reset();
+    }
+
+    /**
+     * aantal verplaatsingen geven
+     * @return 
+     */
+    public int geefAantalVerplaatsingen()
+    {
         return spel.geefAantalVerplaatsingen();
-
     }
 
     /**
-     * Laat het mannetje een beweging uitvoeren op het spelbordInGebruik van Het
-     * Geselecteerde spel. Dit veranderd attribuut waarden van veld, kist,
-     * mannetje indien er een geldige zet wordt gedaan.
-     *
-     * @param beweging Letter "z" (boven), "q"(links), "s"(onder), "d"(rechts),
-     * "u" (undo). Case insensitive.
-     * @see Spel#verplaatsMannetje(java.lang.String)
+     * configureren van spelbord
+     * @param naam 
      */
-    public void verplaatsMannetje(String beweging) {
-        spel.verplaatsMannetje(beweging);
+    public void ConfigureerSpelbord(String naam)
+    {
+        configureerSpel.configureerSpelbord(naam);
     }
 
     /**
-     *
-     * @return true indien het spelbordInGebruik voltooid is. d.w.z. dat alle
-     * doelen op alle kisten staan. false indien dit niet zo is.
-     * @see Spel#checkSpelbordInGebruikIsVoltooid()
+     * configureren van een spel
+     * @param naam 
      */
-    public boolean checkSpelbordInGebruikIsVoltooid() {
-        return spel.checkSpelbordInGebruikIsVoltooid();
+    public void ConfigureerSpel(String naam)
+    {
+        configureerSpel.configureerSpel(naam);
     }
 
     /**
-     *
-     * @return true indien het spelbordInGebruik het laatste spelbord in de
-     * lijst van spelborden is. false indien dit niet zo is.
-     * @see Spel#isLaatsteSpelbordVanHuidigSpel()
-     * @see Spel#lijstSpelborden
+     * default spelbord geven
+     * @return 
      */
-    public boolean isLaatsteSpelbordVanHuidigSpel() {
-        return spel.isLaatsteSpelbordVanHuidigSpel();
+    public String[][] geefDefaultSpelbord()
+    {
+        return zetSpelbordOm(configureerSpel.getLeegSpelbord());
     }
 
     /**
-     * Maakt een nieuw spel aan met een unieke spelnaam en set deze in het
-     * {@link #nieuwSpel} van de DC.
-     *
-     * @param spelnaam Naam dat nog niet voorkomt in de database.
+     * spelbord geven
+     * @param naam
+     * @return 
      */
-    public void maakSpel(String spelnaam) {
-        Spel nieuwSpelLocal = new Spel(spelnaam);
-        this.nieuwSpel = nieuwSpelLocal;
+    public String[][] geefSpelbord(String naam)
+    {
+        return zetSpelbordOm(spel.geefSpelbord(naam));
     }
 
     /**
-     * Maakt een nieuw spelbord aan van het {@link #nieuwSpel}. Spelbordnummer
-     * volgen elkaar op.
-     *
-     * @param spelbordNr Nummer van 1-
-     *
-     * @see Spel#maakSpelbord(int)
+     * plaatsen van een vak
+     * @param positieX
+     * @param positieY
+     * @param ID 
      */
-    public void maakSpelbord(int spelbordNr) {
-        this.nieuwSpel.maakSpelbord(spelbordNr);
+    public void plaatsVak(int positieX, int positieY, int ID)
+    {
+        configureerSpel.plaatsVak(positieX, positieY, ID);
     }
 
     /**
-     * Wordt gebruikt bij CREATIE van een spel. Plaats een item op de
-     * corresponderende x-y coord van het {@link Spel#nieuwSpelbord}, dit
-     * spelbord zit in {@link #nieuwSpel}.
-     *
-     * @param item # = muur o = doel (kleine o) K = Kist . = leeg
-     * @ = Speler + = achtergrond. A.d.h.v. deze symbolen wroden de attrubiten u
-     * {@link Veld}, {@link Mannetje} en {@link Kist} correct ingesteld.
-     *
-     * @param XCOORD 0-based. ligt tussen 0-9
-     * @param YCOORD 0-based. ligt tussen 0-9
-     * @see Spel#plaatsItem(char, int, int)
+     * plaatsen van txtfile in database
      */
-    public void plaatsItem(char item, int XCOORD, int YCOORD) {
-        this.nieuwSpel.plaatsItem(item, XCOORD, YCOORD);
+    public void maakSpelbord() throws FileNotFoundException
+    {
+        /**
+         * SpelBord maken
+         */
+        spel.maakSpelbord(keuzeSpel);
     }
 
     /**
-     * Wordt gebruikt bij WIJZIGING van een bestaand spel. Plaats een item op de
-     * corresponderende x-y coord van het {@link Spel#spelbordInGebruik}, dit
-     * spelbord zit in {@link #spel}.
-     *
-     * @param item # = muur o = doel (kleine o) K = Kist . = leeg
-     * @ = Speler + = achtergrond. A.d.h.v. deze symbolen wroden de attrubiten u
-     * {@link Veld}, {@link Mannetje} en {@link Kist} correct ingesteld.
-     *
-     * @param XCOORD 0-based. ligt tussen 0-9
-     * @param YCOORD 0-based. ligt tussen 0-9
-     * @see Spel#plaatsItemWijziging(char, int, int)
+     * spelbord in database plaatsen
+     * @param naam 
      */
-    public void plaatsItemWijziging(char item, int XCOORD, int YCOORD) {
-        this.spel.plaatsItemWijziging(item, XCOORD, YCOORD);
+    public void zetSpelbordInDatabase(String naam)
+    {
+        configureerSpel.zetSpelbordInDatabase(naam);
     }
 
     /**
-     * Reset het bord bij creatie van een nieuw spelbord.
-     *
-     * @param spelbordNr de nummer van het spelbord dat momenteel gecreeerd
-     * word.
-     * @see Spel#resetBord(int)
+     * spel in database steken
+     * @param naam 
      */
-    public void resetBord(int spelbordNr) {
-        this.nieuwSpel.resetBord(spelbordNr);
+    public void zetSpelInDatabase(String naam)
+    {
+        configureerSpel.zetSpelInDatabase(naam);
     }
 
     /**
-     *
-     * @return true indien de {@link Spelbord#undoStack} in SpelbordInGebruik
-     * van het geselecteerde spel leeg is. false indien het niet leeg is.
-     * @see Spel#IsStackEmpty()
+     * gewijzigd spelbord in database steken
+     * @param spelNaam
+     * @param spelbordNaam 
      */
-    public boolean IsStackEmpty() {
-        return this.spel.IsStackEmpty();
-    }
-
-    /**
-     * Roept {@link Spel#IsCorrectControleNieuwSpelbord() } aan. Controleert of
-     * het {@link Spel#nieuwSpelbord} van het voldoet aan de voorwaarden. De
-     * voorwaarden zijn: Er moet een volledig gesloten muur zijn. Er mogen geen
-     * velden(.,@,K,o,*) grenzen aan achtergrond opvullig, er moet een muur
-     * tussen zitten. Het aantal mannetjes = 1. Het aantal doelen is minsten 1
-     * en het aantal kisten = het aantal doelen.
-     *
-     * @return true indien aan de voorwaarden voldaan word, false indien niet.
-     */
-    public boolean IsCorrectControleNieuwSpelbord() {
-        return this.nieuwSpel.IsCorrectControleNieuwSpelbord();
+    public void zetGewijzigdSpelbordInDatabase(String spelNaam, String spelbordNaam)
+    {
+        configureerSpel.zetGewijzigdSpelbordInDatabase(spelNaam, spelbordNaam);
     }
     
     /**
-     * Roept {@link Spel#IsCorrectControleGewijzigdSpelbord()} aan. Controleert of
-     * het {@link Spel#spelbordInGebruik} van het voldoet aan de voorwaarden. De
-     * voorwaarden zijn: Er moet een volledig gesloten muur zijn. Er mogen geen
-     * velden(.,@,K,o,*) grenzen aan achtergrond opvullig, er moet een muur
-     * tussen zitten. Het aantal mannetjes = 1. Het aantal doelen is minsten 1
-     * en het aantal kisten = het aantal doelen.
-     *
-     * @return true indien aan de voorwaarden voldaan word, false indien niet.
+     * delete van het spelbord
+     * @param spelbordNaam 
      */
-    public boolean IsCorrectControleGewijzigdSpelbord(){
-        return this.spel.IsCorrectControleGewijzigdSpelbord();
-    }
-
-    /**
-     * Schrijft een nieuw spel weg door aanroep van
-     * {@link SpelRepository#registreerNieuwSpel(domein.Spel)} en schrijft
-     * alsook de spelborden van dit nieuw spel weg door de aanroepn van {@link Spel#registreerNieuwSpelbord()
-     * }
-     */
-    public void registreerNieuwSpel() {
-        spelRep.registreerNieuwSpel(this.nieuwSpel);
-        this.nieuwSpel.registreerNieuwSpelbord();
-    }
-
-    /**
-     * aanroep van {@link Spel#geefNieuwSpelbord() }
-     *
-     * @return Het spelbord, in een 2d array van chars, van een nieuw gecreerd
-     * spel waarvan het spelbord gemaakt wordt. Elke char stelt een symbool voor
-     * op de respectievelijke x-y plaats.
-     */
-    public char[][] geefNieuwSpelbord() {
-        return nieuwSpel.geefNieuwSpelbord();
-    }
-
-    /**
-     * roept {@link Spel#geefAantalDoelen() } aan.
-     *
-     * @return het aantal doelen van het {@link Spel#nieuwSpelbord} in het
-     * {@link #nieuwSpel} van de DC.
-     */
-    public int geefAantalDoelen() {
-        return nieuwSpel.geefAantalDoelen();
+    public void deleteSpelbord(String spelbordNaam)
+    {
+        configureerSpel.deleteSpelbord(spelbordNaam);
     }
     
     /**
-     * roept {@link Spel#geefAantalDoelenConfig() } aan.
-     *
-     * @return het aantal doelen van het {@link Spel#spelbordInGebruik} in het bestaande
-     * {@link #spel} van de DC.
+     * wijzigen van de spelnaam
      */
-    public int geefAantalDoelenConfig() {
-        return spel.geefAantalDoelenConfig();
-    }
-
-    /**
-     * roept {@link Spel#geefAantalKisten() } aan.
-     *
-     * @return het aantal kisten van het {@link Spel#nieuwSpelbord} in het
-     * {@link #nieuwSpel} van de DC.
-     */
-    public int geefAantalKisten() {
-        return nieuwSpel.geefAantalKisten();
+    public void wijzigSpelNaam()
+    {
+        configureerSpel.wijzigSpelNaam();
     }
     
     /**
-     * roept {@link Spel#geefAantalKistenConfig() } aan.
-     *
-     * @return het aantal kisten van het {@link Spel#spelbordInGebruik} in het
-     * {@link #spel} van de DC.
+     * wijzigen van het spelbordnaam
      */
-    public int geefAantalKistenConfig() {
-        return spel.geefAantalKistenConfig();
-    }
-
-    /**
-     * Roept {@link Spel#getSpelNaam() } aan.
-     *
-     * @return De naam van het {@link #nieuwSpel} van de DC.
-     */
-    public String geefNiewSpelSpelnaam() {
-        return nieuwSpel.getSpelNaam();
-    }
-
-    /**
-     * Roept {@link Spel#geefLijstSpelbordenGeselecteerdSpel() } aan.
-     *
-     * @return Alle spelborden uit {@link Spel#lijstSpelborden}, in een 2d array
-     * van chars. Elke char stelt een symbool voor op de respectievelijke x-y
-     * plaats.
-     */
-    public ArrayList<char[][]> geefLijstSpelbordenGeselecteerdSpel() {
-        return spel.geefLijstSpelbordenGeselecteerdSpel();
-    }
-
-    /**
-     * Roept roept {@link Spel#geefGekozenSpelbord(int)() } aan.
-     *
-     * @param nr Nummer van het spelbord in het geselecteerde spel.
-     * @return Het spelbord met opgegeven nummer, in een 2d array van chars,
-     * vanuit {@link Spel#lijstSpelborden} van het geselcteerde spel. Elke char
-     * stelt een symbool voor op de respectievelijke x-y plaats.
-     */
-    public char[][] geefGekozenSpelbord(int nr) {
-        return spel.geefGekozenSpelbord(nr);
-    }
-
-    /**
-     * roept {@link Spel#verwijderSpelbord() } aan. Verwijderd het spelbord
-     * opbject uit de {@link Spel#lijstSpelborden} van het geselecteerde spel.
-     */
-    public void verwijderSpelbord() {
-        spel.verwijderSpelbord();
-    }
-
-    /**
-     * Roept {@link Spel#bevestigWijzigingenWegschrijven() } aan. Schrijft de
-     * wijzigingen van alle spelborden in het geselecteerde spel weg naar de
-     * Database.
-     */
-    public void bevestigWijzigingenWegschrijven() {
-        this.spel.bevestigWijzigingenWegschrijven();
-    }
-
-    /**
-     * Roept {@link Spel#setSpelbordInGebruik(int) } aan. Set het spelbord in
-     * gebruik naar een spelbord met opgegeven nr. uit
-     * {@link Spel#lijstSpelborden}. Standaard (gebeurt in {@link Spel#Spel(java.lang.String)
-     * }) staat {@link Spel#spelbordInGebruik} ingesteld op het allereerste
-     * spelbord uit {@link Spel#lijstSpelborden}.
-     *
-     * @param spelbordNummer Het nummer van het spelbord dat je wil setten.
-     */
-    public void setSpelSpelbordInGebruik(int spelbordNummer) {
-        spel.setSpelbordInGebruik(spelbordNummer);
+    public void wijzigSpelbordNaam()
+    {
+        configureerSpel.wijzigSpelbordNaam();
     }
     
     /**
-     * Roept {@link Spel#getSpelNaam() } aan.
-     * @return De naam van het geselecteerde spel terug.
+     * saven spelnaam
+     * @param spelNaam 
      */
-    public String geefSpelNaam(){
-        return spel.getSpelNaam();
+    public void saveSpelNaam(String spelNaam)
+    {
+        configureerSpel.setSpelNaam(spelNaam);
     }
+    
+    /**
+     * saven van het spelbordnaam
+     * @param spelbordNaam 
+     */
+    public void saveSpelbordNaam(String spelbordNaam)
+    {
+        configureerSpel.setSpelbordNaam(spelbordNaam);
     }
+
+    /**
+     * bestaat het spelbord
+     * @param naam
+     * @return 
+     */
+    public boolean bestaatSpelbord(String naam)
+    {
+        return configureerSpel.bestaatSpelbord(naam);
+    }
+    
+    /**
+     * updaten van de spelbordlijst
+     */
+    public void updateSpelbordLijst()
+    {
+        configureerSpel.updateSpelbordLijst();
+        
+    }
+
+    /**
+     * bestaat het spel
+     * @param naam
+     * @return 
+     */
+    public boolean bestaatSpel(String naam)
+    {
+        if(lijstSpelen == null)
+            lijstSpelen = geefLijstSpelen();
+        String[] spelen = lijstSpelen;
+
+        for(String spelNaam: spelen)
+        {
+            if(spelNaam.equals(naam))
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * bevat het alle onderdelen
+     * @return 
+     */
+    public boolean bevatAlleOnderdelen()
+    {
+        return configureerSpel.bevatAlleOnderdelen();
+    }
+
+    /**
+     * geeft weer wat de problemen zijn van het nieuwe spelbord
+     * @return 
+     */
+    public String gebreken()
+    {
+        return configureerSpel.gebreken();
+    }
+    
+    
+    /**
+     * kijken welk vak wat is en de gepaste string doorgeven
+     * @param vakken
+     * @param positie
+     * @return 
+     */
+    private String vulIn(List<Vak> vakken, int positie)
+    {
+        if (!vakken.get(positie).isBewandelbaar())
+        {
+            if (!isConsole)
+            {
+                if (positie - 11 < 0)
+                {
+                    if (isMuurRand(vakken.get(positie + 10)) || isMuurRand(vakken.get(positie + 1))
+                            || isMuurRand(vakken.get(positie + 11)) || isMuurRand(vakken.get(positie + 9)))
+                    {
+                        return "#r";
+                    } else
+                    {
+                        return "#";
+                    }
+                } else if (positie + 11 >= vakken.size())
+                {
+                    if (isMuurRand(vakken.get(positie - 10)) || isMuurRand(vakken.get(positie - 1))
+                            || isMuurRand(vakken.get(positie - 11)) || isMuurRand(vakken.get(positie - 9)))
+                    {
+                        return "#r";
+                    } else
+                    {
+                        return "#";
+                    }
+                } else if (isMuurRand(vakken.get(positie - 10)) || isMuurRand(vakken.get(positie + 10)) || isMuurRand(vakken.get(positie + 1)) || isMuurRand(vakken.get(positie - 1))
+                        || isMuurRand(vakken.get(positie - 11)) || isMuurRand(vakken.get(positie + 11)) || isMuurRand(vakken.get(positie - 9)) || isMuurRand(vakken.get(positie + 9)))
+                {
+                    return "#r";
+                }
+            } else
+            {
+                return "#";
+            }
+        } else if (vakken.get(positie).isBewandelbaar())
+        {
+
+            VakWandel vakWandel = (VakWandel) vakken.get(positie);
+
+            if (vakWandel.isIsDoel())
+            {
+                if (!isConsole)
+                {
+                    if (vakWandel.bevatKist())
+                    {
+                        return "$.";
+                    } else if (vakWandel.bevatMannetje())
+                    {
+                        return "@.";
+                    }
+                    else
+                    {
+                        return ".";
+                    }
+                } else
+                {
+                     if (vakWandel.bevatKist())
+                    {
+                        return "$";
+                    } else if (vakWandel.bevatMannetje())
+                    {
+                        return "@";
+                    }
+                    else
+                    {
+                        return ".";
+                    }
+                }
+            } else
+            {
+                if (vakWandel.bevatKist())
+                {
+                    return "$";
+                } else if (vakWandel.bevatMannetje())
+                {
+                    return "@";
+                } else
+                {
+                    return "_";
+                }
+            }
+        }
+
+        return "#";
+    }
+
+    /**
+     * geef vak op een bepaalde positie
+     * @param col
+     * @param row
+     * @return 
+     */
+    public String geefVakOpPositie(int col, int row)
+    {
+        List<Vak> vakken = configureerSpel.getLeegSpelbord().geefVakken();
+        int positie = 10 * col + row;
+
+        return vulIn(vakken, positie);
+    }
+}

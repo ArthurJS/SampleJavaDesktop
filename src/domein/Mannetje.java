@@ -1,35 +1,49 @@
-    package domein;
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package domein;
 
 /**
  *
- * @author Mario
+ * @author Toon
  */
-public class Mannetje{
-    private Veld veld;
-    
+public class Mannetje
+{
+
+    private Vak vak;
+
     /**
-     * Constructor van kist die het klasse attribuut veld instelt met het meegegeven veld
-     * @param veld waar de kist opstaat
+     * mannetje
      */
-    public Mannetje(Veld veld){
-        this.veld=veld;
+    public Mannetje()
+    {
+       
     }
 
     /**
-     *Retourneert een veld Object waar het mannetje opstaat
-     * @return
-     * veld (Veld)
+     * geef vak
+     * @return 
      */
-    public Veld getVeld() {
-        return veld;
+    public Vak getVak()
+    {
+        return vak;
     }
 
     /**
-     * Stelt een Veld object in waar het mannetje opstaat
-     * @param veld
+     * setten van het vak
+     * @param vak 
      */
-    public void setVeld(Veld veld) {
-        this.veld = veld;
+    public void setVak(Vak vak)
+    {
+        if (vak != null)
+        {
+            this.vak = vak;
+        } else
+        {
+            throw new IllegalArgumentException("Vak in hero krijgt een null object");
+        }
     }
-   
+
 }

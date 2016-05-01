@@ -1,0 +1,33 @@
+.root{
+
+}
+/*.button{
+-fx-text-fill: rgb(49, 89, 23);
+-fx-border-color: rgb(49, 89, 23);
+-fx-border-radius: 5;
+-fx-padding: 3 6 6 6;
+-fx-font: 14px Serif;
+-fx-background-color: tomato;
+}*/
+#button{
+    -fx-text-fill: rgb(49, 89, 23);
+-fx-border-color: rgb(49, 89, 23);
+-fx-border-radius: 5;
+-fx-padding: 3 6 6 6;
+-fx-font: 14px Serif;
+-fx-background-color: tomato;
+}
+#Fout{
+    -fx-border-color: lightgreen;
+    -fx-border-width: 2px;
+}
+#Juist{
+    -fx-border-color:green;
+}
+#wachtwoordFout{
+   -fx-border-color: red;
+}
+.status{
+    -fx-background-color: beige;
+    -fx-border-color: black;
+}

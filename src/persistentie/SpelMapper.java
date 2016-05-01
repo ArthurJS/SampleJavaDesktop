@@ -1,6 +1,12 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package persistentie;
 
-import domein.*;
+import domein.Spel;
+import domein.Spelbord;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -9,77 +15,114 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SpelMapper {
+/**
+ *
+ * @author donovandesmedt
+ */
+public class SpelMapper
+{
 
-    public List<String> geefSpelNamen() {
-        List<String> spelNamen = new ArrayList<>();
-
-        try (Connection connectie = DriverManager.getConnection(Connectie.JDBC_URL)) {
-            PreparedStatement query = connectie.prepareStatement("SELECT Spelnaam FROM sokoban.spel");
-
-            try (ResultSet rs = query.executeQuery()) {
-                while (rs.next()) {
-                    spelNamen.add(rs.getString(1));
-                }
-            }
-        } catch (SQLException ex) {
-            throw new RuntimeException(ex);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
-        return spelNamen;
+    List<Spel> spelen ;
+    private SpelbordMapper spelbordMapper;
+    
+    /**
+     * Constructor
+     */
+    public SpelMapper()
+    {
+        spelbordMapper = new SpelbordMapper();
     }
 
-    public Spel geefGeselecteerdSpel(String spelnaam) {
-        Spel spel = null;
-        //connection.close();
-        try (Connection connectie = DriverManager.getConnection(Connectie.JDBC_URL)) {
-            PreparedStatement query = connectie.prepareStatement("SELECT * FROM sokoban.spel WHERE Spelnaam = ?");
-            query.setString(1, spelnaam);
-            try (ResultSet rs = query.executeQuery()) {
-                if (rs.next()) {
+    /**
+     * Geven spelen uit de database
+     * @return 
+     */
+    public List<Spel> geefSpelen()
+    {
+        spelen = new ArrayList<>();
+        spelbordMapper = new SpelbordMapper();
+        try (Connection conn = DriverManager.getConnection(Connectie.jbl))
+        {
+            PreparedStatement query = conn.prepareStatement("SELECT * FROM Spel");
+            try (ResultSet rs = query.executeQuery())
+            {
+                while (rs.next())
+                {
+                    //**Ophalen van variabels uit de databank en daarmee spel aanmaken */
+                    String naam = rs.getString("naam");
                     
-                    spel = new Spel(rs.getString(1));
+
+                    //**Toevoegen speler naar lijst*/
+                    
+                    spelen.add(new Spel(naam, spelbordMapper.geefSpelborden(naam)));
                 }
             }
-        } catch (SQLException ex) {
+        } catch (SQLException ex)
+        {
             throw new RuntimeException(ex);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
         }
 
-        return spel;
+        return spelen;
     }
     
-    public int geefTotaalAantalSpelbordenVanInGuiGekozenSpel(String spelnaam){
-        int aantalSpelborden = 0;
-
-        try (Connection connectie = DriverManager.getConnection(Connectie.JDBC_URL)) {
-            PreparedStatement query = connectie.prepareStatement("SELECT COUNT(*) FROM sokoban.spelbord WHERE spel_Spelnaam = ?");
-            query.setString(1, spelnaam);
-            try (ResultSet rs = query.executeQuery()) {
-                if (rs.next()) {
-                    aantalSpelborden = Integer.parseInt(rs.getString(1));
-                }
-            }
-        } catch (SQLException ex) {
-            throw new RuntimeException(ex);
-        } catch (NumberFormatException e) {
-            throw new RuntimeException(e);
-        }
-
-        return aantalSpelborden;
+    /**
+     * Geef de custommap spel
+     * @return 
+     */
+    public List<Spelbord> geefLijstCustomSpelen()
+    {   
+        return spelbordMapper.geefSpelborden("custommap"); 
     }
-    public void registreerNieuwSpel(Spel nieuwespel){
-        try (Connection connectie = DriverManager.getConnection(Connectie.JDBC_URL)){
-            PreparedStatement sql = connectie.prepareStatement("INSERT INTO sokoban.spel (Spelnaam) values(?);");
-            sql.setString(1, nieuwespel.getSpelNaam());
-            sql.executeUpdate();
-        }catch (SQLException ex){
-            throw new RuntimeException(ex);
-        }catch (Exception e){
-            throw new RuntimeException(e);
+
+    /**
+     * Voegt een spel toe
+     * @param naam 
+     */
+    public void voegSpelToe(String naam)
+    {
+        /**
+         * Toevoegen van een nieuw vak aan de databanken
+         */
+        try
+        {
+            Class.forName("com.mysql.jdbc.Driver");
+            Connection conn = DriverManager.getConnection(Connectie.jbl);
+            PreparedStatement query = conn.prepareStatement("INSERT INTO Spel(naam)"
+                    + "VALUES (?)");
+            query.setString(1, naam);
+            query.executeUpdate();
+
+        } catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+            throw new RuntimeException(e);         
+        }
+    }
+    
+    /**
+     * Wijzigen van een spelnaam
+     * @param orgNaam
+     * @param spelNaam 
+     */
+    public void wijzigNaam(String orgNaam, String spelNaam)
+    {
+        try
+        {
+            Class.forName("com.mysql.jdbc.Driver");
+            Connection conn = DriverManager.getConnection(Connectie.jbl);
+            PreparedStatement keyCheckOff = conn.prepareStatement("SET foreign_key_checks = 0;");
+            PreparedStatement keyCheckOn = conn.prepareStatement("SET foreign_key_checks = 1;");
+            PreparedStatement query = conn.prepareStatement("UPDATE Spel set naam = ? where naam = ?");
+            query.setString(1, spelNaam);
+            query.setString(2, orgNaam);
+            keyCheckOff.executeQuery();
+            query.executeUpdate();
+            keyCheckOn.executeQuery();
+
+        } catch (Exception e)
+        {
+            System.out.println(e.getMessage());
+            throw new RuntimeException(e);         
         }
     }
 }

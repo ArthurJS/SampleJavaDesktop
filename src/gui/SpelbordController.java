@@ -1,247 +1,274 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package gui;
 
-import static LanguageResources.Resource.labels;
 import domein.DomeinController;
-import java.io.IOException;
-import javafx.event.EventHandler;
+import java.util.Optional;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Node;
-import javafx.scene.Scene;
+import javafx.geometry.HPos;
+import javafx.geometry.VPos;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.image.Image;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.Priority;
+import javafx.scene.canvas.*;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.text.Font;
+import resources.ResourceHandling;
 
-public class SpelbordController extends FlowPane implements LanguageReload {
+/**
+ * FXML Controller class
+ *
+ * @author Toon
+ */
+public class SpelbordController extends GridPane
+{
 
-    @FXML
-    private GridPane gridpaneSpelbord;
-    @FXML
-    private Label lblTotaalAantalSpelborden;
-    @FXML
-    private Label lblHuidigSpelBord;
-    @FXML
-    private TextField txfAantalSpelbordenTotaal;
-    @FXML
-    private TextField txfAantalVoltooid;
-    @FXML
-    private TextField txfAantalStappen;
-    @FXML
-    private ImageView movePic;
-    @FXML
-    private Button btnUndo;
+    private DomeinController domeinController;
+    private String[][] spelbord;
     @FXML
     private Button btnReset;
     @FXML
     private Label lblSpelNaam;
     @FXML
-    private Button btnLijstSpelNamen;
-//    @FXML
-//    private Button btnSpelMenu;
+    private Label lblSpelbordNaam;
+    @FXML
+    private Label lblVerplaatsing;
 
-    private DomeinController dc;
-    private HoofdPaneelController hoofdP;
-    private ImageView imgViewSpelbord[][] = new ImageView[10][10]; //Deze 2d array gebruiken om nieuwe imgviews te zetten in de rijen/kols vd gridpane
-    // moet aangepast worden bij event
-    private double imgSeize;// =  ((this.hoofdP.getWidth()/10.0)-2);
-    private int Kistteller = 0;
-    private Font fontReg;
-    private Font fontPoke;
-    private Object me = this;
+    private Canvas[][] canvasLijst;
+    private KeyCode keyCode;
+    @FXML
+    private Button btnHome;
 
-    public SpelbordController(DomeinController dc, HoofdPaneelController hpc) {
-        this.dc = dc;
-        this.hoofdP = hpc;
-        this.hoofdP.voegControllerObjectToeAanLijst(this);
-        fontReg = Font.loadFont(SpelbordController.class.getResource("font/brandon_light.OTF").toExternalForm(), 14);
-        fontPoke = Font.loadFont(SpelbordController.class.getResource("font/Pokemon Solid.ttf").toExternalForm(), 14);
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("Spelbord.fxml"));//Pad meegeven naar image etc.....
-        loader.setRoot(this);
-        loader.setController(this);
-        try {
-            loader.load();
-        } catch (IOException ex) {
-            throw new RuntimeException(ex);
-        }
-        buildGUI();
+    public SpelbordController(DomeinController dc)
+    {
+        domeinController = dc;
+        keyCode = KeyCode.DOWN;
+
+        LoaderSchermen.getInstance().setLocation("Spelbord.fxml", this);
+
+        /**
+         * Canvas lijst aanvragen
+         */
+        canvasLijst = new Canvas[10][10];
+        vulCanvasLijstin();
+
+        spelbord = domeinController.geefSpelbord();
+        vulSpeelbordIn(spelbord);
+        lblVerplaatsing.setText("0");
+        lblSpelNaam.setText(domeinController.geefSpel());
+        lblSpelbordNaam.setText(domeinController.geefGekozenSpelbord());
+        btnHome.setText(ResourceHandling.getInstance().getString("Knop.home"));
     }
 
-    private void buildGUI() {
-        imgSeize = ((this.hoofdP.getCenter().computeAreaInScreen() / this.hoofdP.getWidth() / 10.0) - 5.5);
-        this.btnUndo.setDisable(true);
-        this.btnReset.setDisable(true);
-        btnReset.setFont(fontPoke);
-        btnUndo.setFont(fontPoke);
-        lblSpelNaam.setFont(fontPoke);
-        updateLabels();
-        updateSpelbord();
+    /**
+     * Aanmajken van canvassen
+     */
+    private void vulCanvasLijstin()
+    {
+        for (int i = 0; i < canvasLijst.length; i++)
+        {
+            for (int j = 0; j < canvasLijst[i].length; j++)
+            {
+                Canvas canvas = new Canvas(30, 30);
+                this.add(canvas, i, j);
+                canvasLijst[i][j] = canvas;
+                GridPane.setHalignment(canvas, HPos.CENTER);
+                GridPane.setValignment(canvas, VPos.CENTER);
 
-        Scene scene = this.hoofdP.getScene();
-        scene.setOnKeyPressed(new EventHandler<KeyEvent>() {
+                GridPane.setHgrow(canvas, Priority.ALWAYS);
+                GridPane.setVgrow(canvas, Priority.ALWAYS);
+            }
+        }
+    }
 
-            @Override
-            public void handle(KeyEvent event) {
-                if (hoofdP.getCenter().getClass().equals(me.getClass())) {//referen naar this wijst niet meer naar Spelbordcontroller in innerklasse.
+    /**
+     * Invullen van de images voor het spelbord
+     *
+     * @param spelbord
+     */
+    private void vulSpeelbordIn(String[][] spelbord)
+    {
+        for (int i = 0; i < spelbord.length; i++)
+        {
+            for (int j = 0; j < spelbord[i].length; j++)
+            {
 
-                    String keuze = "";
-                    if (event.getCode() == KeyCode.Z) {
-                        keuze = "z";
-                        movePic.setImage(new Image(getClass().getResourceAsStream("images/MovesUp.png")));
-                    } else if (event.getCode() == KeyCode.Q) {
-                        keuze = "q";
-                        movePic.setImage(new Image(getClass().getResourceAsStream("images/MovesLeft.png")));
-                    } else if (event.getCode() == KeyCode.S) {
-                        keuze = "s";
-                        movePic.setImage(new Image(getClass().getResourceAsStream("images/MovesDown.png")));
-                    } else if (event.getCode() == KeyCode.D) {
-                        keuze = "d";
-                        movePic.setImage(new Image(getClass().getResourceAsStream("images/MovesRight.png")));
-                    } else {
-                        return;
-                    }
+                GraphicsContext gc = canvasLijst[j][i].getGraphicsContext2D();
 
-                    dc.verplaatsMannetje(keuze);
-                    btnUndo.setDisable(false);
-                    btnReset.setDisable(false);
-                    updateSpelbord();
-                    if (!dc.isLaatsteSpelbordVanHuidigSpel() && dc.checkSpelbordInGebruikIsVoltooid()) {//deze methode past het spelbordInGebruik aan als het voltooid is, dus de return waarde moet niet gecontroleerd worden
-                        try {
-                            Thread.sleep(250);
-                        } catch (InterruptedException ex) {
-                            Thread.currentThread().interrupt();
-                        }
-                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-                        alert.setTitle("Sokémon");
-                        alert.setGraphic(new ImageView(new Image(this.getClass().getResourceAsStream("images/complete-icon.png"))));
-                        alert.setHeaderText(labels.getString("eenSpelbordVoltooidHeader"));
-                        alert.setContentText(labels.getString("eenspelbordVoltooidContent"));
-                        alert.showAndWait();
-                        updateSpelbord();
-                    }
+                switch (spelbord[i][j])
+                {
+                    case "#":
+                        drawImage(gc, "/images/muur.png", 0, 0);
+                        break;
+                    case "#r":
+                        drawImage(gc, "/images/muur_rand.png", 0, 0);
+                        break;
+                    case "@":
+                        drawImage(gc, "/images/wandel.png", 0, 0);
+                        tekenMannetje(gc);
+                        break;
+                    case ".":
+                        drawImage(gc, "/images/doel.png", 0, 0);
+                        break;
+                    case "$.":
+                        drawImage(gc, "/images/doel.png", 0, 0);
+                        drawImage(gc, "/images/kist.png", 5, 5);
+                        break;
+                    case "@.":
+                        drawImage(gc, "/images/doel.png", 0, 0);
+                        tekenMannetje(gc);
+                        break;
+                    case "$":
+                        drawImage(gc, "/images/wandel.png", 0, 0);
+                        drawImage(gc, "/images/kist.png", 5, 5);
+                        break;
+                    case "_":
+                        drawImage(gc, "/images/wandel.png", 0, 0);
+                        break;
 
-                    if (dc.checkSpelbordInGebruikIsVoltooid() & dc.isLaatsteSpelbordVanHuidigSpel() == true) {
-                        hoofdP.setCongratulationsPaneel(new CongratulationsController(dc, hoofdP));
-                        hoofdP.setCenter(hoofdP.getCongratulationsPaneel());
-                    }
                 }
             }
-
-        });
-
-        scene.setOnKeyReleased(new EventHandler<KeyEvent>() {
-
-            @Override
-            public void handle(KeyEvent event) {
-                movePic.setImage(new Image(getClass().getResourceAsStream("images/Moves.png")));
-            }
-        });
-    }
-
-    @Override
-    public void updateLabels() {
-        this.lblSpelNaam.setText(dc.geefSpelNaam());
-        this.btnLijstSpelNamen.setText(labels.getString("GUIBackConfigSpel"));
-        //this.btnSpelMenu.setText(labels.getString("GUIback"));
-        this.lblTotaalAantalSpelborden.setText(labels.getString("totaalAantalsb"));
-        this.lblHuidigSpelBord.setText(labels.getString("aantalVoltooide"));
-        lblHuidigSpelBord.setFont(fontReg);
-        lblTotaalAantalSpelborden.setFont(fontReg);
-
-    }
-
-    @FXML
-    private void btnUndoOnMouseClicked(MouseEvent event) {
-
-        dc.verplaatsMannetje("u");
-        updateSpelbord();
-        if (this.dc.IsStackEmpty()) {
-            this.btnUndo.setDisable(true);
-            this.btnReset.setDisable(true);
         }
-
     }
 
-    @FXML
-    private void btnLijstSpelNamenMouseClicked(MouseEvent event) {
-        this.hoofdP.setCenter(this.hoofdP.getSpelnamenPaneel());
-    }
-
-//    @FXML
-//    private void btnSpelMenu(MouseEvent event) {
-//        this.hoofdP.setCenter(this.hoofdP.getSpelmenuPaneel());
-//    }
-
-    @FXML
-    private void btnResetOnMouseClicked(MouseEvent event) {
-
-        dc.geefSpelbordInGebruikInit();
-        updateSpelbord();
-        this.btnUndo.setDisable(true);
-        this.btnReset.setDisable(true);
-    }
-
-    private Image setGepasteImage(char symboolOpSpelbord) {//gebruiken voor updaten en creatie.
-        Image img = null;
-
-        switch (symboolOpSpelbord) {
-            case '@':
-                img = new Image(this.getClass().getResourceAsStream("images/MannetjePickachuSand.png"));
-                break;
-            case 'K':
-                img = new Image(this.getClass().getResourceAsStream("images/Kist3.png"));
-                break;
-            case '#':
-                img = new Image(this.getClass().getResourceAsStream("images/Wall-red-tree.png"));
-                break;
-            case 'o':
-                img = new Image(this.getClass().getResourceAsStream("images/doel.png"));
-                break;
-            case '*':
-                img = new Image(this.getClass().getResourceAsStream("images/KistOpDoel.png"));
-                break;
-            case '.':
-                img = new Image(this.getClass().getResourceAsStream("images/Sand-empty-veld.png"));
-                break;
-            case '+':
-                img = new Image(this.getClass().getResourceAsStream("images/Grass-Background.png"));
-                break;
-        }
-
-        return img;
-    }
-
-    private void updateSpelbord()//gebruik deze methode bij eventafhandling
+    /**
+     * Dit gaat tekenen hoe mannetje getoont moet worden
+     *
+     * @param gc
+     */
+    public void tekenMannetje(GraphicsContext gc)
     {
-        this.txfAantalSpelbordenTotaal.setText("" + dc.geefTotaalAantalSpelborden());
-        this.txfAantalVoltooid.setText("" + dc.geefAantalVoltooideSpelborden());
-        this.txfAantalStappen.setText("" + dc.geefAantalVerplaatsingen());
-        this.gridpaneSpelbord.getChildren().clear();
-        char[][] sb = dc.geefSpelbordInGebruik();
-
-        for (int i = 0; i < 10; i++) {//Deze methode is eigenlijk niet performant. Beter met enhanced for kijken welke images veranderd zijn en die aanpassen.
-            for (int j = 0; j < 10; j++) {
-                ImageView imgView = new ImageView();
-                Image img = null;
-                img = setGepasteImage(sb[i][j]);
-                imgView.setImage(img);
-                //imgView.resize((this.hoofdP.getCenter().computeAreaInScreen()/this.hoofdP.getWidth()/10)-0.5,(this.hoofdP.getCenter().computeAreaInScreen()/this.hoofdP.getWidth()/10)-0.5);
-                imgView.setFitWidth(imgSeize);
-                imgView.setFitHeight(imgSeize);
-//              GridPane.setConstraints(imgView, j, i);
-                this.imgViewSpelbord[i][j] = imgView;
-                this.gridpaneSpelbord.add(imgView, j, i);
-
-            }
-
+        switch (keyCode)
+        {
+            case LEFT:
+                drawImage(gc, "/images/hero_links.png", 5, 5);
+                break;
+            case RIGHT:
+                drawImage(gc, "/images/hero_rechts.png", 5, 5);
+                break;
+            case DOWN:
+                drawImage(gc, "/images/hero_onder.png", 5, 5);
+                break;
+            case UP:
+                drawImage(gc, "/images/hero_boven.png", 5, 5);
+                break;
         }
     }
+
+    /**
+     * Tekenen van de Image
+     *
+     * @param gc
+     * @param path
+     * @param xPos
+     * @param yPos
+     */
+    public void drawImage(GraphicsContext gc, String path, int xPos, int yPos)
+    {
+        gc.drawImage(new Image(getClass().getResourceAsStream(path)), xPos, yPos);
+    }
+
+    /**
+     * Omzetten van een KeyEvent naar een String
+     *
+     * @param event
+     * @return
+     */
+    private String keyEventToString(KeyEvent event)
+    {
+        KeyCode key = event.getCode();
+
+        switch (key)
+        {
+            case LEFT:
+                return "links";
+            case RIGHT:
+                return "rechts";
+            case DOWN:
+                return "onder";
+            case UP:
+                return "boven";
+            default:
+                throw new IllegalArgumentException("Verkeerde command ingegeven!");
+        }
+
+    }
+
+    @FXML
+    private void gridPaneOnKeyPressed(KeyEvent event)
+    {
+        domeinController.verplaatsHero(keyEventToString(event));
+        keyCode = event.getCode();
+
+        lblVerplaatsing.setText(String.format("%d", domeinController.geefAantalVerplaatsingen()));
+        spelbord = domeinController.geefSpelbord();
+
+        if (domeinController.isSpelbordVoltooid())
+        {
+            vulSpeelbordIn(spelbord);
+
+            domeinController.zoekNietVoltooidSpelbord();
+            lblSpelbordNaam.setText(domeinController.geefGekozenSpelbord());
+            spelbord = domeinController.geefSpelbord();
+
+            if (domeinController.isEindeSpel())
+            {
+                LoaderSchermen.getInstance().load("Sokoban", new KeuzeSpelSchermController(domeinController), 600, 389, this);
+            } else
+            {
+                verderSpelen();
+            }
+
+            keyCode = KeyCode.DOWN;
+        }
+
+        vulSpeelbordIn(spelbord);
+
+    }
+
+    @FXML
+    private void resetOnAction(ActionEvent event)
+    {
+        domeinController.Reset();
+        spelbord = null;
+        spelbord = domeinController.geefSpelbord();
+        lblVerplaatsing.setText("0");
+        vulSpeelbordIn(spelbord);
+    }
+
+    /**
+     * Dit gaat vragen of er nog verder gespeelt wilt worden
+     */
+    private void verderSpelen()
+    {
+        Alert boodschap = new Alert(Alert.AlertType.CONFIRMATION);
+        boodschap.setTitle(ResourceHandling.getInstance().getString("Speelverder"));
+        boodschap.setHeaderText(ResourceHandling.getInstance().getString("Speelverder"));
+
+        ButtonType Annuleer = new ButtonType(ResourceHandling.getInstance().getString("Nee"));
+        ButtonType Ok = new ButtonType(ResourceHandling.getInstance().getString("Ja"));
+        boodschap.getButtonTypes().setAll(Annuleer, Ok);
+        Optional<ButtonType> result = boodschap.showAndWait();
+
+        if (result.get() == Annuleer)
+        {
+            LoaderSchermen.getInstance().load("sokoban", new KiesConfigureerSchermController(domeinController), 300, 300, this);
+        }
+    }
+
+    @FXML
+    private void btnHomeOnAction(ActionEvent event)
+    {
+        LoaderSchermen.getInstance().load("Sokoban", new KiesConfigureerSchermController(domeinController), 300, 300, this);
+    }
+
 }
